@@ -76,13 +76,19 @@ def extract_text_from_pptx(file) -> str:
     except Exception as e:
         return f"PPTX抽出エラー: {e}"
 
+# ★修正前の「あらゆるCSVを力技で100%読み込む最強ロジック」を完全復元
 def load_csv_data(file):
-    for enc in ["utf-8", "shift_jis", "cp932"]:
-        try:
-            file.seek(0)
-            df = pd.read_csv(file, encoding=enc, sep=None, engine="python", on_bad_lines="skip")
-            if not df.empty: return df
-        except: continue
+    encodings = ["utf-8", "shift_jis", "cp932", "utf-8-sig", "iso-8859-1"]
+    delimiters = [",", "\t", ";"]
+    for encoding in encodings:
+        for delimiter in delimiters:
+            try:
+                file.seek(0)
+                df = pd.read_csv(file, encoding=encoding, sep=delimiter, engine="python", on_bad_lines="skip")
+                if not df.empty and len(df.columns) >= 2:
+                    return df
+            except Exception:
+                continue
     return None
 
 def generate_with_retry(client, model_name, prompt, schema, phase_name):
@@ -132,7 +138,6 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
 
     with st.spinner("AIが戦略とデータのギャップを深掘り解析中..."):
         try:
-            # 正解である2.5モデルを使用
             client = genai.Client(api_key=api_key)
             model_name = "gemini-2.5-flash"
             
@@ -182,7 +187,6 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                             "properties": {
                                 "word": {"type": "string"},
                                 "score": {"type": "integer"},
-                                # ★ 安全装置1：AIの出力を4種類のみに強制ロック（Enum設定）
                                 "category": {
                                     "type": "string",
                                     "enum": ["一致", "乖離（ポジティブ）", "乖離（ネガティブ）", "その他"]
@@ -222,7 +226,6 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
 if st.session_state.bas_result:
     res = st.session_state.bas_result
     
-    # ★ 安全装置2：データが空っぽでもクラッシュしないための初期化ガード
     df = pd.DataFrame(res.get("ranking_data", []))
     if df.empty:
         df = pd.DataFrame(columns=['word', 'score', 'category', 'reason'])
@@ -307,6 +310,13 @@ if st.session_state.bas_result:
         return [''] * 3
 
     st.dataframe(df_table.style.apply(color_rows, axis=1), use_container_width=True, height=550, hide_index=True)
+
+    with st.expander("📄 参考：生成AI分析資料から抽出された理想キーワード一覧"):
+        d = res.get("dictionary", {})
+        c1, c2, c3 = st.columns(3)
+        c1.write("**コア価値**\n" + ", ".join(d.get("core", [])))
+        c2.write("**機能・効能**\n" + ", ".join(d.get("functional", [])))
+        c3.write("**専門性**\n" + ", ".join(d.get("professional", [])))
 
 else:
     st.html("""
