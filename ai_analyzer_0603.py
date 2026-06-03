@@ -76,13 +76,11 @@ def extract_text_from_pptx(file) -> str:
     except Exception as e:
         return f"PPTX抽出エラー: {e}"
 
-# ★列数の制限を完全に撤廃し、あらゆる形式のCSV/TXTを確実に読み込む最強ロジック
 def load_csv_data(file):
     encodings = ["utf-8", "shift_jis", "cp932", "utf-8-sig", "euc-jp", "iso-8859-1"]
     for encoding in encodings:
         try:
             file.seek(0)
-            # sep=None, engine='python' により、カンマ・タブ・スペース等の区切り文字を自動判別
             df = pd.read_csv(file, encoding=encoding, sep=None, engine="python", on_bad_lines="skip")
             if not df.empty:
                 return df
@@ -106,7 +104,6 @@ def generate_with_retry(client, model_name, prompt, schema, phase_name):
             return json.loads(res.text)
         except Exception as e:
             err_msg = str(e)
-            # 短時間制限（429）の場合、画面には出さずに裏側で静かに待機する
             if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
                 match = re.search(r"retry in ([\d\.]+)s", err_msg)
                 if match and attempt < 2:
@@ -116,7 +113,6 @@ def generate_with_retry(client, model_name, prompt, schema, phase_name):
                 else:
                     st.error("❌ APIの1日上限に達しました。明日までお待ちいただくか、有料APIキーへ切り替えてください。")
                     st.stop()
-            # 混雑エラー（503）などの場合
             elif attempt < 2:
                 time.sleep(5)
                 continue
@@ -185,7 +181,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                                 "score": {"type": "integer"},
                                 "category": {
                                     "type": "string",
-                                    "enum": ["一致", "乖離（ポジティブ）", "乖離（ネガティブ）", "その他"]
+                                    "enum": ["一致", "乖離（ポジティブ）", "乖離（ネガティブ）"]
                                 },
                                 "reason": {"type": "string"}
                             },
@@ -199,12 +195,16 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
 
             prompt_analysis = f"""
             理想像: {json.dumps(dictionary_data, ensure_ascii=False)}
-            実際のSNSデータ: {csv_context}
+            実際の生成AIデータ: {csv_context}
             
             [指示]
             1. 診断ストーリー: 3つのカテゴリ(一致/ポジティブ乖離/ネガティブ乖離)について、各300文字程度の流れるような文章で記述せよ。項目分けや箇条書きは禁止。
             2. 改善提言: ネガティブをポジティブに変え、ポジティブを公式化するための戦略方針を1行で、具体的アクションを5つ作成せよ。
-            3. 詳細エビデンス: 上位20〜25語について、判定理由をロジカルに記述せよ。なぜ一致/乖離なのか、戦略のどの部分に関連するかを明記せよ。
+            3. 詳細エビデンス: 上位20〜25語について、カテゴリを"一致", "乖離（ポジティブ）", "乖離（ネガティブ）"の3つのいずれかに必ず分類せよ。
+               また、「reason（判定の具体的な理由）」は、公式サイトの理想像と生成AIの回答の違い・関係性に絞って、簡潔に記載せよ。
+               - 一致：どのように一致しているのか。
+               - 乖離（ポジティブ）：どのように乖離しているのか、なぜそれがポジティブなのか。
+               - 乖離（ネガティブ）：どのように乖離しているのか、なぜそれがネガティブなのか。
             """
             
             final_data = generate_with_retry(client, model_name, prompt_analysis, response_schema, "総合ギャップ分析")
@@ -235,11 +235,102 @@ if st.session_state.bas_result:
         with st.expander("🔧 デバッグデータ"):
             st.json(res)
 
-    # ① 現状診断（300文字ストーリー）
+    # === 【機能拡張】印刷用高精度PDFレポート出力用HTMLの生成 ===
+    story = res.get("diagnosis_story", {})
+    
+    # テーブル行の組み立て
+    table_rows_html = ""
+    for _, row in df.iterrows():
+        cat = row.get('category', '')
+        row_cls = "row-match" if cat == "一致" else "row-pos" if "ポジティブ" in cat else "row-neg"
+        table_rows_html += f"""
+        <tr class="{row_cls}">
+            <td style="font-weight: bold; border-bottom: 1px solid #e2e8f0; padding: 10px;">{row.get('word', '')}</td>
+            <td style="border-bottom: 1px solid #e2e8f0; padding: 10px; white-space: nowrap;">{cat}</td>
+            <td style="border-bottom: 1px solid #e2e8f0; padding: 10px; font-size: 13px;">{row.get('reason', '')}</td>
+        </tr>
+        """
+
+    actions_html = "".join([f"<li style='margin-bottom: 8px;'>{action}</li>" for action in res.get("improvement_actions", [])])
+
+    html_report = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>AI Strategy Scan Report</title>
+        <style>
+            body {{ font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; color: #1e293b; line-height: 1.6; padding: 30px; max-width: 900px; margin: 0 auto; background-color: #ffffff; }}
+            .header {{ background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 8px solid #007bff; margin-bottom: 30px; }}
+            h1 {{ margin: 0; color: #1e293b; font-size: 24px; }}
+            h2 {{ color: #1e293b; border-left: 5px solid #007bff; padding-left: 10px; font-size: 18px; margin-top: 35px; margin-bottom: 15px; page-break-after: avoid; }}
+            .grid {{ display: table; width: 100%; table-layout: fixed; margin-bottom: 25px; }}
+            .col {{ display: table-cell; width: 33.33%; padding: 15px; border-radius: 6px; box-sizing: border-box; vertical-align: top; }}
+            .match {{ background-color: #e6f4ea; color: #137333; border: 1px solid #c3e6cb; }}
+            .pos {{ background-color: #e8f0fe; color: #1a73e8; border: 1px solid #b8daff; }}
+            .neg {{ background-color: #fce8e6; color: #c5221f; border: 1px solid #f5c6cb; }}
+            .info-box {{ background-color: #e8f0fe; border-left: 5px solid #007bff; padding: 15px; border-radius: 4px; margin-bottom: 15px; font-weight: bold; color: #1a73e8; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
+            th {{ background-color: #f1f5f9; font-weight: bold; text-align: left; padding: 12px 10px; border-bottom: 2px solid #cbd5e1; font-size: 14px; }}
+            .row-match {{ background-color: #f2faf4; }}
+            .row-pos {{ background-color: #f4f8ff; }}
+            .row-neg {{ background-color: #fff5f5; }}
+            @media print {{
+                body {{ padding: 0; }}
+                h2 {{ page-break-inside: avoid; }}
+                tr {{ page-break-inside: avoid; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>📊 AI Strategy Scan 分析結果レポート</h1>
+            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">対象ブランド: {brand_name} ({brand_url}) &nbsp;|&nbsp; 戦略シンクロ率: <strong>{res.get('consistency_score', 0)}%</strong></p>
+        </div>
+
+        <h2>🎯 ① 現状診断：イメージの一致と乖離</h2>
+        <div class="grid">
+            <div class="col match" style="margin-right: 10px;">
+                <div style="font-weight: bold; margin-bottom: 8px;">🟢 一致（狙い通り）</div>
+                <div style="font-size: 13px;">{story.get('match', '')}</div>
+            </div>
+            <div class="col pos" style="margin-right: 10px; margin-left: 10px;">
+                <div style="font-weight: bold; margin-bottom: 8px;">🔵 乖離：ポジティブ（新発見）</div>
+                <div style="font-size: 13px;">{story.get('positive_gap', '')}</div>
+            </div>
+            <div class="col neg" style="margin-left: 10px;">
+                <div style="font-weight: bold; margin-bottom: 8px;">🔴 乖離：ネガティブ（課題）</div>
+                <div style="font-size: 13px;">{story.get('negative_gap', '')}</div>
+            </div>
+        </div>
+
+        <h2>🚀 ② 今後取り組むべきこと</h2>
+        <div class="info-box">【最優先戦略方針】 {res.get('topline', '')}</div>
+        <ol style="padding-left: 20px; margin-top: 10px;">
+            {actions_html}
+        </ol>
+
+        <h2>📖 ③ 詳細情報（判定エビデンス一覧）</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 25%;">注目キーワード</th>
+                    <th style="width: 20%;">判定分類</th>
+                    <th style="width: 55%;">判定の具体的な理由・背景</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows_html}
+            </tbody>
+        </table>
+    </body>
+    </html>
+    """
+
+    # ① 現状診断
     st.markdown("### 🎯 ① 現状診断：イメージの一致と乖離")
     st.caption("公式のブランド戦略が生成AIの回答にどう反映されているか、一致点と乖離の物語を300文字ずつのストーリーで紐解きます。")
     
-    story = res.get("diagnosis_story", {})
     col1, col2, col3 = st.columns(3)
     with col1:
         st.html("<div style='background-color:#e6f4ea; padding:12px; border-radius:5px; border-left:5px solid #28a745; font-weight:bold; color:#137333; margin-bottom:10px;'>🟢 一致（狙い通り）</div>")
@@ -254,24 +345,23 @@ if st.session_state.bas_result:
     st.divider()
 
     # ② 割合のグラフ
-    st.markdown("### 📊 ② 生成AI言言の割合（ポートフォリオ）")
-    total_v = df['score'].sum()
+    st.markdown("### 📊 ② 一致・乖離（ポジティブ）・乖離（ネガティブ）の割合")
+    
     m_val = df[df['category'] == '一致']['score'].sum() if not df.empty else 0
     p_val = df[df['category'] == '乖離（ポジティブ）']['score'].sum() if not df.empty else 0
     n_val = df[df['category'] == '乖離（ネガティブ）']['score'].sum() if not df.empty else 0
+    total_v = m_val + p_val + n_val
 
     m_p = (m_val / total_v * 100) if total_v > 0 else 0
     p_p = (p_val / total_v * 100) if total_v > 0 else 0
     n_p = (n_val / total_v * 100) if total_v > 0 else 0
-    o_p = max(0.0, 100 - (m_p + p_p + n_p)) if total_v > 0 else 100
 
-    # ドーナツグラフの描画
-    p1, p2, p3 = m_p, m_p + p_p, m_p + p_p + n_p
+    p1, p2, p3 = m_p, m_p + p_p, 100.0
     col_chart, col_metric = st.columns([1, 1])
     with col_chart:
         st.html(f"""
         <div style="display: flex; justify-content: center; align-items: center; height: 220px;">
-            <div style="width: 180px; height: 180px; border-radius: 50%; background: conic-gradient(#28a745 0% {p1}%, #007bff {p1}% {p2}%, #dc3545 {p2}% {p3}%, #e2e8f0 {p3}% 100%); display: flex; justify-content: center; align-items: center;">
+            <div style="width: 180px; height: 180px; border-radius: 50%; background: conic-gradient(#28a745 0% {p1}%, #007bff {p1}% {p2}%, #dc3545 {p2}% {p3}%); display: flex; justify-content: center; align-items: center;">
                 <div style="width: 110px; height: 110px; border-radius: 50%; background-color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
                     <span style="font-size: 12px; color: #64748b; font-weight: bold;">シンクロ率</span>
                     <span style="font-size: 24px; color: #1e293b; font-weight: 800;">{res.get('consistency_score', 0)}%</span>
@@ -284,7 +374,6 @@ if st.session_state.bas_result:
         st.markdown(f"🟢 :green[**一致（狙い通り）**]: `{m_p:.1f}%`")
         st.markdown(f"🔵 :blue[**乖離（ポジティブ）**]: `{p_p:.1f}%`")
         st.markdown(f"🔴 :red[**乖離（ネガティブ）**]: `{n_p:.1f}%`")
-        st.markdown(f"⚪ :gray[**その他**]: `{o_p:.1f}%`")
 
     st.divider()
 
@@ -308,6 +397,20 @@ if st.session_state.bas_result:
         return [''] * 3
 
     st.dataframe(df_table.style.apply(color_rows, axis=1), use_container_width=True, height=550, hide_index=True)
+
+    # === 📄 レポート印刷・PDF保存エリアの配置 ===
+    st.divider()
+    st.markdown("### 📥 レポートの出力（PDF保存）")
+    st.caption("表示されている解析結果を、崩れのない美しいA4レイアウトのレポートとして出力します。")
+    
+    st.download_button(
+        label="📄 レポート（印刷用高画質HTML）をダウンロード",
+        data=html_report,
+        file_name=f"AI_Strategy_Scan_Report_{brand_name}.html",
+        mime="text/html",
+        use_container_width=True
+    )
+    st.info("💡 **【PDF保存の方法】**\nダウンロードしたファイルをダブルクリックしてブラウザで開き、キーボードの「**Ctrl + P**（Macは **Cmd + P**）」を押して、送信先を『**PDFに保存**』にするだけで、きれいにレイアウトされたA4サイズのPDFレポートが作成されます。")
 
     with st.expander("📄 参考：生成AI分析資料から抽出された理想キーワード一覧"):
         d = res.get("dictionary", {})
