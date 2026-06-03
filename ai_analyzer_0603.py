@@ -169,17 +169,21 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         "items": {
                             "type": "object",
                             "properties": {
-                                # ★ 4カラム構成へアップデート（reasonの追加）
-                                "official_content": {"type": "string"},
-                                "ai_content": {"type": "string"},
+                                # ★ エビデンスではなく「生成AIの分析結果（競合ポジショニング）」に変更
+                                "topic": {"type": "string"},
+                                "ai_mention": {"type": "string"},
+                                "competitor_comparison": {
+                                    "type": "string",
+                                    "enum": ["単独言及", "自社優先", "競合同列", "競合優先"]
+                                },
+                                "analysis": {"type": "string"},
                                 "category": {
                                     "type": "string",
                                     "enum": ["一致", "乖離（ポジティブ）", "乖離（ネガティブ）"]
                                 },
-                                "reason": {"type": "string"},
                                 "score": {"type": "integer"}
                             },
-                            "required": ["official_content", "ai_content", "category", "reason", "score"]
+                            "required": ["topic", "ai_mention", "competitor_comparison", "analysis", "category", "score"]
                         }
                     },
                     "consistency_score": {"type": "integer"}
@@ -194,11 +198,12 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
             [指示]
             1. 診断ストーリー: 3つのカテゴリ(一致/ポジティブ乖離/ネガティブ乖離)について、各300文字程度の流れるような文章で記述せよ。項目分けや箇条書きは禁止。
             2. 改善提言: ネガティブをポジティブに変え、ポジティブを公式化するための戦略方針を1行で、具体的アクションを5つ作成せよ。
-            3. 詳細エビデンス: 上位20〜25のトピックについて、「公式発信」と「生成AI発信」を対比させて比較せよ。
-               - official_content: 公式の戦略意図や発信内容（要点のみを非常に簡潔に）
-               - ai_content: 生成AIでの実際の言及内容（要点のみを非常に簡潔に）
-               - category: "一致", "乖離（ポジティブ）", "乖離（ネガティブ）" のいずれかに必ず分類せよ。
-               - reason: その判定に至った理由（なぜ一致か、なぜポジ/ネガな乖離か）を端的に簡潔に記載せよ。
+            3. 生成AIの言及内容の分析: 上位20〜25のトピックについて、生成AIがどのように言及しているかを分析せよ。特に競合他社と併記されている文脈に着目し、以下の項目を抽出せよ。
+               - topic: 言及されているトピックやテーマ（簡潔に）
+               - ai_mention: 生成AIでの実際の言及内容（要点のみを非常に簡潔に）
+               - competitor_comparison: 競合との比較状況を "単独言及", "自社優先", "競合同列", "競合優先" のいずれかに必ず分類せよ。
+               - analysis: その言及がブランドに与える影響や、競合と比較した際の強み・弱みの分析結果を簡潔に記載せよ。
+               - category: グラフ計算のため、"一致", "乖離（ポジティブ）", "乖離（ネガティブ）" のいずれかに必ず分類せよ。
             """
             
             final_data = generate_with_retry(client, model_name, prompt_analysis, response_schema, "総合ギャップ分析")
@@ -218,7 +223,7 @@ if st.session_state.bas_result:
     
     df = pd.DataFrame(res.get("ranking_data", []))
     if df.empty:
-        df = pd.DataFrame(columns=['official_content', 'ai_content', 'category', 'reason', 'score'])
+        df = pd.DataFrame(columns=['topic', 'ai_mention', 'competitor_comparison', 'analysis', 'category', 'score'])
     
     if 'score' in df.columns:
         df['score'] = pd.to_numeric(df['score'], errors='coerce').fillna(0).astype(int)
@@ -233,13 +238,27 @@ if st.session_state.bas_result:
     table_rows_html = ""
     for _, row in df.iterrows():
         cat = row.get('category', '')
+        comp_status = row.get('competitor_comparison', '')
+        
+        # 競合ステータスに絵文字バッジを付与
+        if comp_status == '自社優先':
+            comp_badge = "👑 自社優先"
+        elif comp_status == '競合同列':
+            comp_badge = "🤝 競合同列"
+        elif comp_status == '競合優先':
+            comp_badge = "⚠️ 競合優先"
+        else:
+            comp_badge = "👤 単独言及"
+
+        # 背景色は「一致/乖離」の判定ステータスを引き継ぐ（視覚的な連動）
         row_cls = "row-match" if cat == "一致" else "row-pos" if "ポジティブ" in cat else "row-neg"
+        
         table_rows_html += f"""
         <tr class="{row_cls}">
-            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; word-wrap: break-word;">{row.get('official_content', '')}</td>
-            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; word-wrap: break-word;">{row.get('ai_content', '')}</td>
-            <td style="font-weight: bold; border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; text-align: center;">{cat}</td>
-            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; word-wrap: break-word;">{row.get('reason', '')}</td>
+            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-weight: bold; font-size: 13px; word-wrap: break-word;">{row.get('topic', '')}</td>
+            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; word-wrap: break-word;">{row.get('ai_mention', '')}</td>
+            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; font-weight: bold; text-align: center; white-space: nowrap;">{comp_badge}</td>
+            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; word-wrap: break-word;">{row.get('analysis', '')}</td>
         </tr>
         """
 
@@ -302,9 +321,9 @@ if st.session_state.bas_result:
         
     st.divider()
 
-    # ④ 詳細情報（カスタムHTML表を埋め込み：文字折り返し完全対応）
-    st.markdown("### 📖 ④ 詳細情報（判定エビデンス対比表）")
-    st.caption("公式の戦略意図と実際の生成AIの出力を横並びで比較し、その乖離理由を可視化しています。")
+    # ④ 生成AIの言及内容と競合比較分析（カスタムHTML表）
+    st.markdown("### 📖 ④ 生成AIの言及内容と競合比較分析")
+    st.caption("生成AIの出力内容を分析し、自社ブランドが競合他社と比較してどのようなポジショニングで語られているかを可視化します。※行の背景色は全体シンクロ率（一致/乖離）の判定と連動しています。")
     
     ui_table_html = f"""
     <style>
@@ -319,10 +338,10 @@ if st.session_state.bas_result:
         <table class="custom-evidence-table">
             <thead>
                 <tr>
-                    <th style="width: 25%;">公式発信の内容</th>
-                    <th style="width: 25%;">生成AI発信の内容</th>
-                    <th style="width: 15%; text-align: center;">判定分類</th>
-                    <th style="width: 35%;">判定の理由</th>
+                    <th style="width: 20%;">トピック</th>
+                    <th style="width: 30%;">生成AIの言及内容</th>
+                    <th style="width: 15%; text-align: center;">競合との比較</th>
+                    <th style="width: 35%;">分析結果・インサイト</th>
                 </tr>
             </thead>
             <tbody>
@@ -398,14 +417,14 @@ if st.session_state.bas_result:
             {actions_html}
         </ol>
 
-        <h2>📖 ③ 詳細情報（判定エビデンス対比表）</h2>
+        <h2>📖 ③ 生成AIの言及内容と競合比較分析</h2>
         <table>
             <thead>
                 <tr>
-                    <th style="width: 25%;">公式発信の内容</th>
-                    <th style="width: 25%;">生成AI発信の内容</th>
-                    <th style="width: 15%; text-align: center;">判定分類</th>
-                    <th style="width: 35%;">判定の理由</th>
+                    <th style="width: 20%;">トピック</th>
+                    <th style="width: 30%;">生成AIの言及内容</th>
+                    <th style="width: 15%; text-align: center;">競合との比較</th>
+                    <th style="width: 35%;">分析結果・インサイト</th>
                 </tr>
             </thead>
             <tbody>
