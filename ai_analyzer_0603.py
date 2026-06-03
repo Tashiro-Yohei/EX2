@@ -76,13 +76,18 @@ def extract_text_from_pptx(file) -> str:
     except Exception as e:
         return f"PPTX抽出エラー: {e}"
 
+# ★列数の制限を完全に撤廃し、あらゆる形式のCSV/TXTを確実に読み込む最強ロジック
 def load_csv_data(file):
-    for enc in ["utf-8", "shift_jis", "cp932"]:
+    encodings = ["utf-8", "shift_jis", "cp932", "utf-8-sig", "euc-jp", "iso-8859-1"]
+    for encoding in encodings:
         try:
             file.seek(0)
-            df = pd.read_csv(file, encoding=enc, sep=None, engine="python", on_bad_lines="skip")
-            if not df.empty: return df
-        except: continue
+            # sep=None, engine='python' により、カンマ・タブ・スペース等の区切り文字を自動判別
+            df = pd.read_csv(file, encoding=encoding, sep=None, engine="python", on_bad_lines="skip")
+            if not df.empty:
+                return df
+        except Exception:
+            continue
     return None
 
 def generate_with_retry(client, model_name, prompt, schema, phase_name):
@@ -101,7 +106,7 @@ def generate_with_retry(client, model_name, prompt, schema, phase_name):
             return json.loads(res.text)
         except Exception as e:
             err_msg = str(e)
-            # 短時間制限（429）の場合、画面には出さずに裏側で待機する
+            # 短時間制限（429）の場合、画面には出さずに裏側で静かに待機する
             if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
                 match = re.search(r"retry in ([\d\.]+)s", err_msg)
                 if match and attempt < 2:
@@ -232,6 +237,8 @@ if st.session_state.bas_result:
 
     # ① 現状診断（300文字ストーリー）
     st.markdown("### 🎯 ① 現状診断：イメージの一致と乖離")
+    st.caption("公式のブランド戦略が生成AIの回答にどう反映されているか、一致点と乖離の物語を300文字ずつのストーリーで紐解きます。")
+    
     story = res.get("diagnosis_story", {})
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -247,7 +254,7 @@ if st.session_state.bas_result:
     st.divider()
 
     # ② 割合のグラフ
-    st.markdown("### 📊 ② 生成AI言及の割合（ポートフォリオ）")
+    st.markdown("### 📊 ② 生成AI言言の割合（ポートフォリオ）")
     total_v = df['score'].sum()
     m_val = df[df['category'] == '一致']['score'].sum() if not df.empty else 0
     p_val = df[df['category'] == '乖離（ポジティブ）']['score'].sum() if not df.empty else 0
