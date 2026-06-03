@@ -76,23 +76,17 @@ def extract_text_from_pptx(file) -> str:
     except Exception as e:
         return f"PPTX抽出エラー: {e}"
 
-# ★修正前の「あらゆるCSVを力技で100%読み込む最強ロジック」を完全復元
 def load_csv_data(file):
-    encodings = ["utf-8", "shift_jis", "cp932", "utf-8-sig", "iso-8859-1"]
-    delimiters = [",", "\t", ";"]
-    for encoding in encodings:
-        for delimiter in delimiters:
-            try:
-                file.seek(0)
-                df = pd.read_csv(file, encoding=encoding, sep=delimiter, engine="python", on_bad_lines="skip")
-                if not df.empty and len(df.columns) >= 2:
-                    return df
-            except Exception:
-                continue
+    for enc in ["utf-8", "shift_jis", "cp932"]:
+        try:
+            file.seek(0)
+            df = pd.read_csv(file, encoding=enc, sep=None, engine="python", on_bad_lines="skip")
+            if not df.empty: return df
+        except: continue
     return None
 
 def generate_with_retry(client, model_name, prompt, schema, phase_name):
-    """制限に当たった際に自動待機して突破する通信関数"""
+    """制限に当たった際に裏側で静かに自動待機して突破する通信関数"""
     for attempt in range(3):
         try:
             res = client.models.generate_content(
@@ -107,15 +101,12 @@ def generate_with_retry(client, model_name, prompt, schema, phase_name):
             return json.loads(res.text)
         except Exception as e:
             err_msg = str(e)
-            # 短時間制限（429）の場合、秒数を読み取って待機
+            # 短時間制限（429）の場合、画面には出さずに裏側で待機する
             if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
                 match = re.search(r"retry in ([\d\.]+)s", err_msg)
                 if match and attempt < 2:
                     wait_sec = int(float(match.group(1))) + 2
-                    ph = st.empty()
-                    ph.warning(f"⏳ 【{phase_name}】アクセス制限のため {wait_sec}秒 待機して自動再開します...")
                     time.sleep(wait_sec)
-                    ph.empty()
                     continue
                 else:
                     st.error("❌ APIの1日上限に達しました。明日までお待ちいただくか、有料APIキーへ切り替えてください。")
