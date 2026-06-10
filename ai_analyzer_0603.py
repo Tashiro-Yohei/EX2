@@ -7,19 +7,28 @@ import json
 import re
 import time
 from pptx import Presentation
-import docx  # 追加: Wordファイルを読み込むためのライブラリ
+import docx
 
 # --- 1. アプリ設定 & UI ---
 st.set_page_config(page_title="AI Analyzer", layout="wide", initial_sidebar_state="expanded")
 
-# 画面の上詰めを強制するカスタムCSS
+# 画面の余白を最適化するカスタムCSS
 st.html("""
     <style>
-        [data-testid="stSidebarUserContent"] {
-            padding-top: 1rem !important;
+        /* サイドバーの上詰め（ヘッダー部分の余白も削って極限まで上に寄せる） */
+        [data-testid="stSidebarHeader"] {
+            padding-top: 0.5rem !important;
+            padding-bottom: 0rem !important;
+            min-height: auto !important;
         }
+        [data-testid="stSidebarUserContent"] {
+            padding-top: 0rem !important;
+        }
+        
+        /* メイン画面（右側）の上部見切れを解消（少しだけ下げてちょうどよくする） */
         .block-container {
-            padding-top: 1.5rem !important;
+            padding-top: 3.5rem !important; 
+            padding-bottom: 2rem !important;
         }
     </style>
 """)
@@ -49,7 +58,7 @@ with st.sidebar:
     st.markdown("### 📂 データのアップロード")
     uploaded_pptx = st.file_uploader("❶ 生成AI分析資料（PPTX）", type=["pptx"])
     uploaded_csv = st.file_uploader("❷ 現実：生成AIでの言及数データ(CSV)", type=["csv", "txt"])
-    uploaded_docx = st.file_uploader("❸ 補足：生成AIのブランド評価(DOCX)", type=["docx"])  # 追加: Wordファイルのアップロード
+    uploaded_docx = st.file_uploader("❸ 補足：生成AIのブランド評価(DOCX)", type=["docx"])
     
     st.divider()
     if st.button("⏹️ 処理を中断 / 画面をリセット", type="secondary", use_container_width=True):
@@ -81,12 +90,11 @@ def extract_text_from_pptx(file) -> str:
     except Exception as e:
         return f"PPTXエラー: {e}"
 
-# 追加: Wordファイルからテキストを抽出する関数
 def extract_text_from_docx(file) -> str:
     try:
         doc = docx.Document(file)
         text = [paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip()]
-        return "\n".join(text)[:3000]  # 情報過多を防ぐため上限を設ける
+        return "\n".join(text)[:3000]
     except Exception as e:
         return f"DOCXエラー: {e}"
 
@@ -118,7 +126,7 @@ if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", typ
             
             pptx_text = extract_text_from_pptx(uploaded_pptx)
             df_raw = load_csv_data(uploaded_csv)
-            docx_text = extract_text_from_docx(uploaded_docx)  # 追加: DOCXテキストの取得
+            docx_text = extract_text_from_docx(uploaded_docx)
             
             if df_raw is None:
                 st.error("CSVファイルの読み込みに失敗しました。")
@@ -198,7 +206,6 @@ if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", typ
                 "required": ["diagnosis_story", "topline", "improvement_actions", "ranking_data", "consistency_score"]
             }
 
-            # 追加: DOCXの定性データもプロンプトに組み込む
             prompt_analysis = f"""
             Analyze Generative AI output data for "{brand_name}" (Official URL: {brand_url}) against the ideal dictionary.
             
