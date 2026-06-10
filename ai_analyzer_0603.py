@@ -229,8 +229,9 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "positive_gap": What unexpected strengths or positive perceptions did the AI find that the company isn't heavily promoting?
                - "negative_gap": What misconceptions or weak points exist in the AI's understanding compared to the company's intent?
             2. "topline": Write a single-sentence summary strategy for executives.
-            3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps to turn weaknesses into strengths or to leverage unexpected positive perceptions.
-            4. "radar_scores" & "radar_reasons": Score the Generative AI's perception on a scale of 0-100 for the following 5 criteria. Then, in "radar_reasons", provide a specific business reason (approx. 80-100 characters in Japanese) explaining WHY it got this score based on the data.
+            3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps to turn weaknesses into strengths or to leverage unexpected positive perceptions. Make them highly specific.
+            4. "radar_scores" & "radar_reasons": Score the Generative AI's perception on a scale of 0-100 for the following 5 criteria. 
+               CRITICAL for "radar_reasons": Provide a DETAILED business reason (approx. 150-200 characters in Japanese, 2-3 sentences) explaining WHY it got this score based on the data. Explicitly mention what specific keywords/evaluations raised or lowered the score.
                - "brand_philosophy": ブランド理念の浸透度
                - "functional_value": 機能価値の伝達度
                - "emotional_engagement": 情緒的エンゲージメント（顧客の愛着度）
@@ -313,23 +314,21 @@ if st.session_state.bas_result:
     s_sr = radar.get("safety_reputation", 0)
     s_cp = radar.get("competitive_priority", 0)
     
-    # 総合スコア（平均）
     overall = sum([s_bp, s_fv, s_ee, s_sr, s_cp]) / 5.0
     
     def get_color_style(score):
         if score >= 75:
-            return "background-color:#d4edda; border:1px solid #c3e6cb; color:#155724;" # 緑
+            return "background-color:#d4edda; border:1px solid #c3e6cb; color:#155724;"
         elif score >= 60:
-            return "background-color:#fff3cd; border:1px solid #ffeeba; color:#856404;" # 黄
+            return "background-color:#fff3cd; border:1px solid #ffeeba; color:#856404;"
         else:
-            return "background-color:#f8d7da; border:1px solid #f5c6cb; color:#721c24;" # 赤
+            return "background-color:#f8d7da; border:1px solid #f5c6cb; color:#721c24;"
 
     col_radar, col_metrics = st.columns([1, 1])
     
     with col_radar:
         categories = ['ブランド理念の<br>浸透度', '機能価値の<br>伝達度', '情緒的<br>エンゲージメント', 'ブランドの<br>安全性と評判', '対競合優先度']
         scores_list = [s_bp, s_fv, s_ee, s_sr, s_cp]
-        
         categories_closed = categories + [categories[0]]
         scores_closed = scores_list + [scores_list[0]]
         
@@ -344,9 +343,7 @@ if st.session_state.bas_result:
         ))
         
         fig.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 100], showticklabels=False),
-            ),
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100], showticklabels=False)),
             showlegend=False,
             margin=dict(l=60, r=60, t=40, b=40),
             height=380
@@ -359,7 +356,6 @@ if st.session_state.bas_result:
             <div style="font-size:12px; margin-bottom:5px;">総合スコア</div>
             <div style="font-size:32px; font-weight:bold;">{overall:.1f}</div>
         </div>
-        
         <div style="display:flex; gap:10px; margin-bottom:10px;">
             <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_bp)}">
                 <div style="font-size:12px; margin-bottom:5px;">ブランド理念の浸透度</div>
@@ -370,7 +366,6 @@ if st.session_state.bas_result:
                 <div style="font-size:24px; font-weight:bold;">{s_fv:.1f}</div>
             </div>
         </div>
-        
         <div style="display:flex; gap:10px; margin-bottom:10px;">
             <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_ee)}">
                 <div style="font-size:12px; margin-bottom:5px;">情緒的エンゲージメント</div>
@@ -381,7 +376,6 @@ if st.session_state.bas_result:
                 <div style="font-size:24px; font-weight:bold;">{s_sr:.1f}</div>
             </div>
         </div>
-        
         <div style="display:flex; gap:10px;">
             <div style="flex:0.49; padding:15px; border-radius:5px; {get_color_style(s_cp)}">
                 <div style="font-size:12px; margin-bottom:5px;">対競合優先度</div>
@@ -389,22 +383,36 @@ if st.session_state.bas_result:
             </div>
             <div style="flex:0.51;"></div>
         </div>
-        
-        <div style="margin-top:10px; font-size:11px; color:#6c757d;">
-            色分け: 75点以上は緑（優秀）、60-74点は黄（標準）、59点以下は赤（改善が必要）を示します。
-        </div>
         """
         st.html(html_cards)
 
-    # 評価理由の表示エリア
+    # 評価理由をカード型デザインで表示
     st.markdown("#### 📝 各スコアの評価理由（なぜこの点数になったのか）")
-    st.markdown(f"""
-    * **ブランド理念の浸透度 ({s_bp}点):** {reasons.get('brand_philosophy', 'データなし')}
-    * **機能価値の伝達度 ({s_fv}点):** {reasons.get('functional_value', 'データなし')}
-    * **情緒的エンゲージメント ({s_ee}点):** {reasons.get('emotional_engagement', 'データなし')}
-    * **ブランドの安全性と評判 ({s_sr}点):** {reasons.get('safety_reputation', 'データなし')}
-    * **対競合優先度 ({s_cp}点):** {reasons.get('competitive_priority', 'データなし')}
-    """)
+    
+    for title, key, score in [
+        ("ブランド理念の浸透度", "brand_philosophy", s_bp),
+        ("機能価値の伝達度", "functional_value", s_fv),
+        ("情緒的エンゲージメント", "emotional_engagement", s_ee),
+        ("ブランドの安全性と評判", "safety_reputation", s_sr),
+        ("対競合優先度", "competitive_priority", s_cp)
+    ]:
+        if score >= 75:
+            b_color, bg_color, icon = "#28a745", "#f4fcf5", "🟢"
+        elif score >= 60:
+            b_color, bg_color, icon = "#ffc107", "#fffdf5", "🟡"
+        else:
+            b_color, bg_color, icon = "#dc3545", "#fff5f5", "🔴"
+        
+        st.html(f"""
+        <div style="border-left: 5px solid {b_color}; background-color: {bg_color}; padding: 15px; margin-bottom: 12px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <div style="font-weight: bold; font-size: 16px; margin-bottom: 6px; color: #333;">
+                {icon} {title} <span style="color: {b_color}; font-size: 18px; margin-left: 5px;">{score}点</span>
+            </div>
+            <div style="font-size: 14px; color: #555; line-height: 1.6;">
+                {reasons.get(key, 'データなし')}
+            </div>
+        </div>
+        """)
 
     st.divider()
 
@@ -416,9 +424,18 @@ if st.session_state.bas_result:
     
     st.info(f"**【戦略方針】** {res.get('topline')}")
     
-    st.markdown("#### 🛠️ 具体的な5つのアクション")
+    st.markdown("#### 🛠️ 今後打つべき5つのアクション")
     for i, action in enumerate(res.get("improvement_actions", []), 1):
-        st.markdown(f"**{i}.** {action}")
+        st.html(f"""
+        <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 12px; display: flex; align-items: flex-start; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="background-color: #007bff; color: white; border-radius: 50%; min-width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; font-weight: bold; margin-right: 15px; flex-shrink: 0;">
+                {i}
+            </div>
+            <div style="font-size: 15px; color: #334155; line-height: 1.5; padding-top: 2px;">
+                {action}
+            </div>
+        </div>
+        """)
         
     st.divider()
 
