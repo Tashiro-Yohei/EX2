@@ -1,3 +1,4 @@
+import sys
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -6,27 +7,24 @@ import json
 import re
 import time
 from pptx import Presentation
+import docx  # 追加: Wordファイルを読み込むためのライブラリ
 
 # --- 1. アプリ設定 & UI ---
 st.set_page_config(page_title="AI Analyzer", layout="wide", initial_sidebar_state="expanded")
 
+# 画面の上詰めを強制するカスタムCSS
 st.html("""
     <style>
-        [data-testid="stSidebarHeader"] {
-            display: none !important;
-            padding: 0 !important;
-            height: 0 !important;
-        }
         [data-testid="stSidebarUserContent"] {
-            padding-top: 0.5rem !important;
+            padding-top: 1rem !important;
         }
-        [data-testid="stSidebar"] .stTextInput, 
-        [data-testid="stSidebar"] .stFileUploader {
-            margin-bottom: -10px !important;
+        .block-container {
+            padding-top: 1.5rem !important;
         }
     </style>
 """)
 
+# タイトルエリア
 st.html("""
     <div style="background-color:#f8f9fa; padding:20px; border-radius:10px; border-left:8px solid #007bff; margin-bottom:25px;">
         <h2 style="margin:0; color:#1e293b;">📊 AI Analyzer Pro</h2>
@@ -34,29 +32,43 @@ st.html("""
     </div>
 """)
 
+# セッション状態の初期化
 if "bas_result" not in st.session_state:
     st.session_state.bas_result = None
 
+# サイドバー：設定エリア
 with st.sidebar:
     st.markdown("### ⚙️ 解析設定")
-    api_key = st.text_input("🔑 Gemini API Key", type="password", help="Google AI Studioで発行したAPIキー")
+    st.divider()
+    
+    api_key = st.text_input("🔑 Gemini API Key", type="password", help="Google AI Studioで発行したAPIキーを入力してください。")
     brand_name = st.text_input("🏷️ ブランド名", value="ディアナチュラ")
     brand_url = st.text_input("🌐 公式サイトURL", value="https://www.dear-natura.com/")
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
     st.markdown("### 📂 データのアップロード")
     uploaded_pptx = st.file_uploader("❶ 生成AI分析資料（PPTX）", type=["pptx"])
-    uploaded_csv = st.file_uploader("❷ 生成AI言及データ(CSV)", type=["csv", "txt"])
+    uploaded_csv = st.file_uploader("❷ 現実：生成AIでの言及数データ(CSV)", type=["csv", "txt"])
+    uploaded_docx = st.file_uploader("❸ 補足：生成AIのブランド評価(DOCX)", type=["docx"])  # 追加: Wordファイルのアップロード
     
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("⏹️ 画面をリセット", type="secondary", use_container_width=True):
+    st.divider()
+    if st.button("⏹️ 処理を中断 / 画面をリセット", type="secondary", use_container_width=True):
         st.session_state.bas_result = None
         st.rerun()
         
-    debug_mode = st.checkbox("🔧 開発用ログ表示", value=False)
+    st.divider()
+    debug_mode = st.checkbox("🔧 開発者用ログを表示する", value=False)
 
 
 # --- ユーティリティ関数 ---
+def clean_and_parse_json(text: str) -> dict:
+    json_match = re.search(r'\{.*\}', text, re.DOTALL)
+    if not json_match:
+        raise ValueError("JSONが見つかりません")
+    text = json_match.group(0)
+    text = re.sub(r'[\x00-\x1F\x7F]', '', text)
+    return json.loads(text)
+
 def extract_text_from_pptx(file) -> str:
     try:
         prs = Presentation(file)
@@ -67,73 +79,61 @@ def extract_text_from_pptx(file) -> str:
                     text_runs.append(shape.text)
         return "\n".join(text_runs)[:3000]
     except Exception as e:
-        return f"PPTX抽出エラー: {e}"
+        return f"PPTXエラー: {e}"
+
+# 追加: Wordファイルからテキストを抽出する関数
+def extract_text_from_docx(file) -> str:
+    try:
+        doc = docx.Document(file)
+        text = [paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip()]
+        return "\n".join(text)[:3000]  # 情報過多を防ぐため上限を設ける
+    except Exception as e:
+        return f"DOCXエラー: {e}"
 
 def load_csv_data(file):
-    encodings = ["utf-8", "shift_jis", "cp932", "utf-8-sig", "euc-jp", "iso-8859-1"]
+    encodings = ["utf-8", "shift_jis", "cp932", "utf-8-sig", "iso-8859-1"]
+    delimiters = [",", "\t", ";"]
     for encoding in encodings:
-        try:
-            file.seek(0)
-            df = pd.read_csv(file, encoding=encoding, sep=None, engine="python", on_bad_lines="skip")
-            if not df.empty:
-                return df
-        except Exception:
-            continue
-    return None
-
-def generate_with_retry(client, model_name, prompt, schema, phase_name):
-    for attempt in range(3):
-        try:
-            res = client.models.generate_content(
-                model=model_name,
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    temperature=0.1, 
-                    response_mime_type="application/json", 
-                    response_schema=schema
-                )
-            )
-            return json.loads(res.text)
-        except Exception as e:
-            err_msg = str(e)
-            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                match = re.search(r"retry in ([\d\.]+)s", err_msg)
-                if match and attempt < 2:
-                    wait_sec = int(float(match.group(1))) + 2
-                    time.sleep(wait_sec)
-                    continue
-                else:
-                    st.error("❌ APIの1日上限に達しました。明日までお待ちいただくか、有料APIキーへ切り替えてください。")
-                    st.stop()
-            elif attempt < 2:
-                time.sleep(5)
+        for delimiter in delimiters:
+            try:
+                file.seek(0)
+                df = pd.read_csv(file, encoding=encoding, sep=delimiter, engine="python", on_bad_lines="skip")
+                if not df.empty and len(df.columns) >= 2:
+                    return df
+            except Exception:
                 continue
-            else:
-                st.error(f"❌ 分析中にエラーが発生しました: {e}")
-                st.stop()
     return None
 
 
 # --- 2. 分析ロジック ---
-if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_container_width=True):
-    if not api_key or not uploaded_pptx or not uploaded_csv:
-        st.error("左側のサイドバーで、APIキーと2つのファイルをセットしてください。")
+if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", type="primary", use_container_width=True):
+    if not api_key or not brand_url or not uploaded_pptx or not uploaded_csv or not uploaded_docx:
+        st.error("左側のサイドバーで、APIキー、URL、および3つのファイルをすべてセットしてください。")
         st.stop()
 
-    with st.spinner("AIが戦略とデータのギャップを深掘り解析中..."):
+    with st.spinner("AIが指定された4ステップ構成に沿って分析データを構築中..."):
         try:
             client = genai.Client(api_key=api_key)
             model_name = "gemini-2.5-flash"
             
             pptx_text = extract_text_from_pptx(uploaded_pptx)
             df_raw = load_csv_data(uploaded_csv)
+            docx_text = extract_text_from_docx(uploaded_docx)  # 追加: DOCXテキストの取得
             
             if df_raw is None:
                 st.error("CSVファイルの読み込みに失敗しました。")
                 st.stop()
+                
+            csv_context = df_raw.head(35).to_csv(index=False)
             
-            # Phase 1: 理想のキーワード抽出
-            prompt_dict = f"ブランド '{brand_name}' の戦略資料から理想のブランド像キーワードを5つずつ抽出せよ:\n{pptx_text}"
+            # Phase 1: 理想キーワード抽出
+            prompt_dict = f"""
+            ブランド "{brand_name}" (公式URL: {brand_url}) の戦略資料から「理想のブランド像」を示すキーワードを5つずつ抽出してください。
+            
+            [戦略資料テキスト]
+            {pptx_text}
+            """
+            
             dict_schema = {
                 "type": "object",
                 "properties": {
@@ -143,13 +143,29 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 },
                 "required": ["core", "functional", "professional"]
             }
-            dictionary_data = generate_with_retry(client, model_name, prompt_dict, dict_schema, "キーワード抽出")
-            
+
+            # 503混雑エラー対策：フェーズ1の自動リトライループ
+            dictionary_data = None
+            for attempt in range(3):
+                try:
+                    res_dict = client.models.generate_content(
+                        model=model_name,
+                        contents=[prompt_dict],
+                        config=types.GenerateContentConfig(temperature=0.1, response_mime_type="application/json", response_schema=dict_schema)
+                    )
+                    dictionary_data = json.loads(res_dict.text)
+                    break
+                except Exception as e:
+                    if "503" in str(e) and attempt < 2:
+                        time.sleep(3)
+                        continue
+                    raise e
+
             if not dictionary_data:
+                st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
-            
-            # Phase 2: ストーリー構築とエビデンス表の生成
-            csv_context = df_raw.head(35).to_csv(index=False)
+
+            # Phase 2: 戦略的ギャップ分析
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -169,21 +185,12 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         "items": {
                             "type": "object",
                             "properties": {
-                                # ★ エビデンスではなく「生成AIの分析結果（競合ポジショニング）」に変更
-                                "topic": {"type": "string"},
-                                "ai_mention": {"type": "string"},
-                                "competitor_comparison": {
-                                    "type": "string",
-                                    "enum": ["単独言及", "自社優先", "競合同列", "競合優先"]
-                                },
-                                "analysis": {"type": "string"},
-                                "category": {
-                                    "type": "string",
-                                    "enum": ["一致", "乖離（ポジティブ）", "乖離（ネガティブ）"]
-                                },
-                                "score": {"type": "integer"}
+                                "word": {"type": "string"},
+                                "score": {"type": "integer"},
+                                "category": {"type": "string"},
+                                "reason": {"type": "string"}
                             },
-                            "required": ["topic", "ai_mention", "competitor_comparison", "analysis", "category", "score"]
+                            "required": ["word", "score", "category", "reason"]
                         }
                     },
                     "consistency_score": {"type": "integer"}
@@ -191,271 +198,217 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 "required": ["diagnosis_story", "topline", "improvement_actions", "ranking_data", "consistency_score"]
             }
 
+            # 追加: DOCXの定性データもプロンプトに組み込む
             prompt_analysis = f"""
-            理想像: {json.dumps(dictionary_data, ensure_ascii=False)}
-            実際の生成AIデータ: {csv_context}
+            Analyze Generative AI output data for "{brand_name}" (Official URL: {brand_url}) against the ideal dictionary.
             
-            [指示]
-            1. 診断ストーリー: 3つのカテゴリ(一致/ポジティブ乖離/ネガティブ乖離)について、各300文字程度の流れるような文章で記述せよ。項目分けや箇条書きは禁止。
-            2. 改善提言: ネガティブをポジティブに変え、ポジティブを公式化するための戦略方針を1行で、具体的アクションを5つ作成せよ。
-            3. 生成AIの言及内容の分析: 上位20〜25のトピックについて、生成AIがどのように言及しているかを分析せよ。特に競合他社と併記されている文脈に着目し、以下の項目を抽出せよ。
-               - topic: 言及されているトピックやテーマ（簡潔に）
-               - ai_mention: 生成AIでの実際の言及内容（要点のみを非常に簡潔に）
-               - competitor_comparison: 競合との比較状況を "単独言及", "自社優先", "競合同列", "競合優先" のいずれかに必ず分類せよ。
-               - analysis: その言及がブランドに与える影響や、競合と比較した際の強み・弱みの分析結果を簡潔に記載せよ。
-               - category: グラフ計算のため、"一致", "乖離（ポジティブ）", "乖離（ネガティブ）" のいずれかに必ず分類せよ。
+            [IDEAL DICTIONARY]
+            {json.dumps(dictionary_data, ensure_ascii=False)}
+            
+            [GENERATIVE AI RANKING DATA (CSV)]
+            {csv_context}
+            
+            [GENERATIVE AI BRAND EVALUATION (DOCX)]
+            {docx_text}
+            
+            TASK:
+            1. "diagnosis_story": Write 3 fluent narrative paragraphs in Japanese (EACH strictly around 300 characters) without any inner titles or bullet points. Base your story on BOTH the quantitative CSV ranking data AND the qualitative DOCX brand evaluation.
+               - "match": Story of perfect alignments.
+               - "positive_gap": Story of unexpected positive perceptions in AI.
+               - "negative_gap": Story of mismatches, outdated data, or issues in AI.
+            2. "topline": Write a single-sentence summary (in Japanese) focusing on how to convert negative gaps to positive and how to amplify positive gaps in official communication.
+            3. "improvement_actions": Provide EXACTLY 5 specific action items (in Japanese). The items must include methods to turn negative gaps into positive assets, and strategies to strengthen positive gaps in official brand messaging.
+            4. "ranking_data": Classify at least 20 items (around 20-25 lines) from the ranking data into exactly one of these: "一致", "乖離（ポジティブ）", "乖離（ネガティブ）", or "その他".
+               CRITICAL REQUIREMENT FOR "reason": 
+               Do NOT write simple reasons. Explicitly and logically explain WHY that word falls into that classification in Japanese.
+               - For "一致": State exactly which part of the ideal brand strategy or dictionary keyword this word confirms.
+               - For "乖離（ポジティブ）": Explain why this unlisted word provides a new beneficial value, brand asset, or unexpected positive context.
+               - For "乖離（ネガティブ）": Explain why this word indicates a misconception, outdated data issue, competitor overlap, or negative perception.
+            5. "consistency_score": (0-100 how much Generative AI data matches brand strategy).
+            Return JSON in Japanese.
             """
-            
-            final_data = generate_with_retry(client, model_name, prompt_analysis, response_schema, "総合ギャップ分析")
-            
+
+            # 503混雑エラー対策
+            final_data = None
+            for attempt in range(3):
+                try:
+                    res_analysis = client.models.generate_content(
+                        model=model_name,
+                        contents=[prompt_analysis],
+                        config=types.GenerateContentConfig(temperature=0.1, response_mime_type="application/json", response_schema=response_schema)
+                    )
+                    final_data = json.loads(res_analysis.text)
+                    break
+                except Exception as e:
+                    if "503" in str(e) and attempt < 2:
+                        time.sleep(3)
+                        continue
+                    raise e
+
             if final_data:
                 final_data["dictionary"] = dictionary_data
                 st.session_state.bas_result = final_data
+            else:
+                st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
+                st.stop()
 
         except Exception as e:
-            st.error(f"致命的なエラーが発生しました: {e}")
+            st.error(f"分析エラーが発生しました: {e}")
             st.stop()
 
 
 # --- 3. 結果表示 UI ---
 if st.session_state.bas_result:
     res = st.session_state.bas_result
-    
     df = pd.DataFrame(res.get("ranking_data", []))
-    if df.empty:
-        df = pd.DataFrame(columns=['topic', 'ai_mention', 'competitor_comparison', 'analysis', 'category', 'score'])
-    
     if 'score' in df.columns:
         df['score'] = pd.to_numeric(df['score'], errors='coerce').fillna(0).astype(int)
     else:
         df['score'] = 0
 
     if debug_mode and res:
-        with st.expander("🔧 デバッグデータ"):
+        with st.expander("🔧 開発者用デバッグログ"):
             st.json(res)
 
-    # === 【UI/PDF共用】文字が途切れないHTMLテーブルの組み立て ===
-    table_rows_html = ""
-    for _, row in df.iterrows():
-        cat = row.get('category', '')
-        comp_status = row.get('competitor_comparison', '')
-        
-        # 競合ステータスに絵文字バッジを付与
-        if comp_status == '自社優先':
-            comp_badge = "👑 自社優先"
-        elif comp_status == '競合同列':
-            comp_badge = "🤝 競合同列"
-        elif comp_status == '競合優先':
-            comp_badge = "⚠️ 競合優先"
-        else:
-            comp_badge = "👤 単独言及"
-
-        # 背景色は「一致/乖離」の判定ステータスを引き継ぐ（視覚的な連動）
-        row_cls = "row-match" if cat == "一致" else "row-pos" if "ポジティブ" in cat else "row-neg"
-        
-        table_rows_html += f"""
-        <tr class="{row_cls}">
-            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-weight: bold; font-size: 13px; word-wrap: break-word;">{row.get('topic', '')}</td>
-            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; word-wrap: break-word;">{row.get('ai_mention', '')}</td>
-            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; font-weight: bold; text-align: center; white-space: nowrap;">{comp_badge}</td>
-            <td style="border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; word-wrap: break-word;">{row.get('analysis', '')}</td>
-        </tr>
-        """
-
-    # ① 現状診断
-    story = res.get("diagnosis_story", {})
+    # ==========================================
+    # ① 現状診断：イメージの一致と乖離
+    # ==========================================
     st.markdown("### 🎯 ① 現状診断：イメージの一致と乖離")
     st.caption("公式のブランド戦略が生成AIの回答にどう反映されているか、一致点と乖離の物語を300文字ずつのストーリーで紐解きます。")
     
+    story = res.get("diagnosis_story", {})
+    
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.html("<div style='background-color:#e6f4ea; padding:12px; border-radius:5px; border-left:5px solid #28a745; font-weight:bold; color:#137333; margin-bottom:10px;'>🟢 一致（狙い通り）</div>")
-        st.write(story.get("match", "データなし"))
+        st.html("<div style='background-color:#e6f4ea; padding:12px; border-radius:5px; border-left:5px solid #28a745; font-weight:bold; color:#137333; margin-bottom:10px;'>🟢 一致していること（狙い通り）</div>")
+        st.write(story.get("match", "分析データなし"))
+        
     with col2:
-        st.html("<div style='background-color:#e8f0fe; padding:12px; border-radius:5px; border-left:5px solid #007bff; font-weight:bold; color:#1a73e8; margin-bottom:10px;'>🔵 乖離：ポジティブ（新発見）</div>")
-        st.write(story.get("positive_gap", "データなし"))
+        st.html("<div style='background-color:#e8f0fe; padding:12px; border-radius:5px; border-left:5px solid #007bff; font-weight:bold; color:#1a73e8; margin-bottom:10px;'>🔵 乖離：ポジティブ（新たな強み）</div>")
+        st.write(story.get("positive_gap", "分析データなし"))
+        
     with col3:
-        st.html("<div style='background-color:#fce8e6; padding:12px; border-radius:5px; border-left:5px solid #dc3545; font-weight:bold; color:#c5221f; margin-bottom:10px;'>🔴 乖離：ネガティブ（課題）</div>")
-        st.write(story.get("negative_gap", "データなし"))
+        st.html("<div style='background-color:#fce8e6; padding:12px; border-radius:5px; border-left:5px solid #dc3545; font-weight:bold; color:#c5221f; margin-bottom:10px;'>🔴 乖離：ネガティブ（対応すべき課題）</div>")
+        st.write(story.get("negative_gap", "分析データなし"))
             
     st.divider()
 
-    # ② 割合のグラフ
-    st.markdown("### 📊 ② 一致・乖離（ポジティブ）・乖離（ネガティブ）の割合")
+    # ==========================================
+    # ② 生成AI言及の割合（ポートフォリオ）
+    # ==========================================
+    st.markdown("### 📊 ② 生成AI言及の割合（ポートフォリオ）")
+    st.caption("AI上における「一致」「ポジティブ乖離」「ネガティブ乖離」のシェア状況です。")
     
-    m_val = df[df['category'] == '一致']['score'].sum() if not df.empty else 0
-    p_val = df[df['category'] == '乖離（ポジティブ）']['score'].sum() if not df.empty else 0
-    n_val = df[df['category'] == '乖離（ネガティブ）']['score'].sum() if not df.empty else 0
-    total_v = m_val + p_val + n_val
+    total_v = df['score'].sum()
+    m_val = df[df['category'] == '一致']['score'].sum()
+    p_val = df[df['category'] == '乖離（ポジティブ）']['score'].sum()
+    n_val = df[df['category'] == '乖離（ネガティブ）']['score'].sum()
 
-    m_p = (m_val / total_v * 100) if total_v > 0 else 0
-    p_p = (p_val / total_v * 100) if total_v > 0 else 0
-    n_p = (n_val / total_v * 100) if total_v > 0 else 0
+    match_p = (m_val / total_v * 100) if total_v > 0 else 0
+    pos_p = (p_val / total_v * 100) if total_v > 0 else 0
+    neg_p = (n_val / total_v * 100) if total_v > 0 else 0
+    other_p = max(0.0, 100 - (match_p + pos_p + neg_p))
 
-    p1, p2, p3 = m_p, m_p + p_p, 100.0
+    p1 = match_p
+    p2 = p1 + pos_p
+    p3 = p2 + neg_p
+
     col_chart, col_metric = st.columns([1, 1])
+    
     with col_chart:
-        st.html(f"""
+        chart_html = f"""
         <div style="display: flex; justify-content: center; align-items: center; height: 220px;">
-            <div style="width: 180px; height: 180px; border-radius: 50%; background: conic-gradient(#28a745 0% {p1}%, #007bff {p1}% {p2}%, #dc3545 {p2}% {p3}%); display: flex; justify-content: center; align-items: center;">
-                <div style="width: 110px; height: 110px; border-radius: 50%; background-color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <div style="
+                width: 180px; 
+                height: 180px; 
+                border-radius: 50%; 
+                background: conic-gradient(#28a745 0% {p1}%, #007bff {p1}% {p2}%, #dc3545 {p2}% {p3}%, #e2e8f0 {p3}% 100%);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            ">
+                <div style="
+                    width: 110px; 
+                    height: 110px; 
+                    border-radius: 50%; 
+                    background-color: white;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                ">
                     <span style="font-size: 12px; color: #64748b; font-weight: bold;">シンクロ率</span>
                     <span style="font-size: 24px; color: #1e293b; font-weight: 800;">{res.get('consistency_score', 0)}%</span>
                 </div>
             </div>
         </div>
-        """)
+        """
+        st.html(chart_html)
+
     with col_metric:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"🟢 :green[**一致（狙い通り）**]: `{m_p:.1f}%`")
-        st.markdown(f"🔵 :blue[**乖離（ポジティブ）**]: `{p_p:.1f}%`")
-        st.markdown(f"🔴 :red[**乖離（ネガティブ）**]: `{n_p:.1f}%`")
+        st.markdown(f"🟢 :green[**一致（狙い通り）**]: `{match_p:.1f}%`")
+        st.markdown(f"🔵 :blue[**乖離（ポジティブ）**]: `{pos_p:.1f}%`")
+        st.markdown(f"🔴 :red[**乖離（ネガティブ）**]: `{neg_p:.1f}%`")
+        st.markdown(f"⚪ :gray[**その他**]: `{other_p:.1f}%`")
 
     st.divider()
 
+    # ==========================================
     # ③ 今後取り組むべきこと
+    # ==========================================
     st.markdown("### 🚀 ③ 今後取り組むべきこと")
-    st.info(f"**【最優先戦略方針】** {res.get('topline')}")
+    st.caption("ネガティブなギャップを強みに転換する施策と、AIが見つけたポジティブな乖離を公式発信として倍増させる戦略プランです。")
+    
+    st.info(f"**【戦略方針】** {res.get('topline')}")
+    
+    st.markdown("#### 🛠️ 具体的な5つの転換・強化アクション")
     for i, action in enumerate(res.get("improvement_actions", []), 1):
         st.markdown(f"**{i}.** {action}")
         
     st.divider()
 
-    # ④ 生成AIの言及内容と競合比較分析（カスタムHTML表）
-    st.markdown("### 📖 ④ 生成AIの言及内容と競合比較分析")
-    st.caption("生成AIの出力内容を分析し、自社ブランドが競合他社と比較してどのようなポジショニングで語られているかを可視化します。※行の背景色は全体シンクロ率（一致/乖離）の判定と連動しています。")
+    # ==========================================
+    # ④ 詳細情報
+    # ==========================================
+    st.markdown("### 📖 ④ 詳細情報（判定エビデンス一覧）")
+    st.caption("生成AIのデータベース上で検出された上位キーワードについて、なぜその分類に判定されたのかのロジックを整理したエビデンス表です。")
     
-    ui_table_html = f"""
-    <style>
-        .custom-evidence-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; }}
-        .custom-evidence-table th {{ background-color: #f1f5f9; padding: 12px; text-align: left; border-bottom: 2px solid #cbd5e1; position: sticky; top: 0; font-size: 14px; color: #1e293b; }}
-        .custom-evidence-table td {{ color: #334155; }}
-        .row-match {{ background-color: #f2faf4; }}
-        .row-pos {{ background-color: #f4f8ff; }}
-        .row-neg {{ background-color: #fff5f5; }}
-    </style>
-    <div style="max-height: 600px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 15px;">
-        <table class="custom-evidence-table">
-            <thead>
-                <tr>
-                    <th style="width: 20%;">トピック</th>
-                    <th style="width: 30%;">生成AIの言及内容</th>
-                    <th style="width: 15%; text-align: center;">競合との比較</th>
-                    <th style="width: 35%;">分析結果・インサイト</th>
-                </tr>
-            </thead>
-            <tbody>
-                {table_rows_html}
-            </tbody>
-        </table>
-    </div>
-    """
-    st.html(ui_table_html)
-
-
-    # === 📄 レポート印刷・PDF保存エリア ===
-    st.divider()
-    st.markdown("### 📥 レポートの出力（PDF保存）")
-    st.caption("表示されている解析結果を、崩れのない美しいA4レイアウトのレポートとして出力します。")
+    df_display = df[['word', 'category', 'reason']].rename(columns={
+        'word': '注目されたキーワード',
+        'category': 'AIによる判定分類',
+        'reason': '判定の具体的な理由・背景（ロジック）'
+    })
     
-    actions_html = "".join([f"<li style='margin-bottom: 8px;'>{action}</li>" for action in res.get("improvement_actions", [])])
-    
-    html_report = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>AI Strategy Scan Report</title>
-        <style>
-            body {{ font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; color: #1e293b; line-height: 1.6; padding: 30px; max-width: 900px; margin: 0 auto; background-color: #ffffff; }}
-            .header {{ background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 8px solid #007bff; margin-bottom: 30px; }}
-            h1 {{ margin: 0; color: #1e293b; font-size: 24px; }}
-            h2 {{ color: #1e293b; border-left: 5px solid #007bff; padding-left: 10px; font-size: 18px; margin-top: 35px; margin-bottom: 15px; page-break-after: avoid; }}
-            .grid {{ display: table; width: 100%; table-layout: fixed; margin-bottom: 25px; }}
-            .col {{ display: table-cell; width: 33.33%; padding: 15px; border-radius: 6px; box-sizing: border-box; vertical-align: top; }}
-            .match {{ background-color: #e6f4ea; color: #137333; border: 1px solid #c3e6cb; }}
-            .pos {{ background-color: #e8f0fe; color: #1a73e8; border: 1px solid #b8daff; }}
-            .neg {{ background-color: #fce8e6; color: #c5221f; border: 1px solid #f5c6cb; }}
-            .info-box {{ background-color: #e8f0fe; border-left: 5px solid #007bff; padding: 15px; border-radius: 4px; margin-bottom: 15px; font-weight: bold; color: #1a73e8; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
-            th {{ background-color: #f1f5f9; font-weight: bold; padding: 12px 10px; border-bottom: 2px solid #cbd5e1; font-size: 14px; text-align: left; }}
-            .row-match {{ background-color: #f2faf4; }}
-            .row-pos {{ background-color: #f4f8ff; }}
-            .row-neg {{ background-color: #fff5f5; }}
-            @media print {{
-                body {{ padding: 0; }}
-                h2 {{ page-break-inside: avoid; }}
-                tr {{ page-break-inside: avoid; }}
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>📊 AI Strategy Scan 分析結果レポート</h1>
-            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">対象ブランド: {brand_name} ({brand_url}) &nbsp;|&nbsp; 戦略シンクロ率: <strong>{res.get('consistency_score', 0)}%</strong></p>
-        </div>
+    def highlight_display(row):
+        cat = row.get('AIによる判定分類', '')
+        if cat == '一致': return ['background-color: #e6f4ea; color: #137333;'] * len(row)
+        if cat == '乖離（ポジティブ）': return ['background-color: #e8f0fe; color: #1a73e8;'] * len(row)
+        if cat == '乖離（ネガティブ）': return ['background-color: #fce8e6; color: #c5221f;'] * len(row)
+        return [''] * len(row)
 
-        <h2>🎯 ① 現状診断：イメージの一致と乖離</h2>
-        <div class="grid">
-            <div class="col match" style="margin-right: 10px;">
-                <div style="font-weight: bold; margin-bottom: 8px;">🟢 一致（狙い通り）</div>
-                <div style="font-size: 13px;">{story.get('match', '')}</div>
-            </div>
-            <div class="col pos" style="margin-right: 10px; margin-left: 10px;">
-                <div style="font-weight: bold; margin-bottom: 8px;">🔵 乖離：ポジティブ（新発見）</div>
-                <div style="font-size: 13px;">{story.get('positive_gap', '')}</div>
-            </div>
-            <div class="col neg" style="margin-left: 10px;">
-                <div style="font-weight: bold; margin-bottom: 8px;">🔴 乖離：ネガティブ（課題）</div>
-                <div style="font-size: 13px;">{story.get('negative_gap', '')}</div>
-            </div>
-        </div>
+    st.dataframe(df_display.style.apply(highlight_display, axis=1), use_container_width=True, height=550, hide_index=True)
 
-        <h2>🚀 ② 今後取り組むべきこと</h2>
-        <div class="info-box">【最優先戦略方針】 {res.get('topline', '')}</div>
-        <ol style="padding-left: 20px; margin-top: 10px;">
-            {actions_html}
-        </ol>
-
-        <h2>📖 ③ 生成AIの言及内容と競合比較分析</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 20%;">トピック</th>
-                    <th style="width: 30%;">生成AIの言及内容</th>
-                    <th style="width: 15%; text-align: center;">競合との比較</th>
-                    <th style="width: 35%;">分析結果・インサイト</th>
-                </tr>
-            </thead>
-            <tbody>
-                {table_rows_html}
-            </tbody>
-        </table>
-    </body>
-    </html>
-    """
-    
-    st.download_button(
-        label="📄 レポート（印刷用高画質HTML）をダウンロード",
-        data=html_report,
-        file_name=f"AI_Strategy_Scan_Report_{brand_name}.html",
-        mime="text/html",
-        use_container_width=True
-    )
-    st.info("💡 **【PDF保存の方法】**\nダウンロードしたファイルをダブルクリックしてブラウザで開き、キーボードの「**Ctrl + P**（Macは **Cmd + P**）」を押して、送信先を『**PDFに保存**』にするだけで、きれいにレイアウトされたA4サイズのPDFレポートが作成されます。")
-
-    with st.expander("📄 参考：生成AI分析資料から抽出された理想キーワード一覧"):
+    # 参考情報
+    with st.expander("📄 参考：生成AI分析資料から抽出された理想のキーワード一覧"):
         d = res.get("dictionary", {})
         c1, c2, c3 = st.columns(3)
-        c1.write("**コア価値**\n" + ", ".join(d.get("core", [])))
-        c2.write("**機能・効能**\n" + ", ".join(d.get("functional", [])))
-        c3.write("**専門性**\n" + ", ".join(d.get("professional", [])))
+        with c1:
+            st.markdown("**💡 コア価値**")
+            st.write(", ".join(d.get("core", [])) if d.get("core") else "抽出なし")
+        with c2:
+            st.markdown("**✨ 機能・効能**")
+            st.write(", ".join(d.get("functional", [])) if d.get("functional") else "抽出なし")
+        with c3:
+            st.markdown("**🛡️ 社会的信頼・専門性**")
+            st.write(", ".join(d.get("professional", [])) if d.get("professional") else "抽出なし")
 
 else:
     st.html("""
         <div style="text-align:center; padding:100px 20px; color:#94a3b8;">
             <p style="font-size:40px; margin:0;">📥</p>
             <h4 style="margin:10px 0 0 0; color:#64748b;">データがセットされていません</h4>
-            <p style="font-size:14px; margin:5px 0 0 0;">左側のサイドバーに必要な情報をセットして「分析を実行」を押してください。</p>
+            <p style="font-size:14px; margin:5px 0 0 0;">左側のサイドバーにAPIキーを入力し、3つのファイルをセットして「分析を開始する」を押してください。</p>
         </div>
     """)
