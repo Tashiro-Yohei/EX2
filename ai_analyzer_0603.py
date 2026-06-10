@@ -8,6 +8,7 @@ import re
 import time
 from pptx import Presentation
 import docx
+import plotly.graph_objects as go
 
 # --- 1. アプリ設定 & UI ---
 st.set_page_config(page_title="AI Analyzer", layout="wide", initial_sidebar_state="expanded")
@@ -57,8 +58,8 @@ with st.sidebar:
     st.divider()
     st.markdown("### 📂 データのアップロード")
     uploaded_pptx = st.file_uploader("❶ 生成AI分析資料（PPTX）", type=["pptx"])
-    uploaded_csv = st.file_uploader("❷ 現実：生成AIでの言及数データ(CSV)", type=["csv", "txt"])
-    uploaded_docx = st.file_uploader("❸ 補足：生成AIのブランド評価(DOCX)", type=["docx"])
+    uploaded_csv = st.file_uploader("❷ 生成AIでの言及数データ(CSV)", type=["csv", "txt"])
+    uploaded_docx = st.file_uploader("❸ 生成AIのブランド評価(DOCX)", type=["docx"])
     
     st.divider()
     if st.button("⏹️ 処理を中断 / 画面をリセット", type="secondary", use_container_width=True):
@@ -134,9 +135,9 @@ if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", typ
                 
             csv_context = df_raw.head(35).to_csv(index=False)
             
-            # Phase 1: 理想キーワード抽出
+            # Phase 1: オウンドメディアからのキーワード抽出
             prompt_dict = f"""
-            ブランド "{brand_name}" (公式URL: {brand_url}) の戦略資料から「理想のブランド像」を示すキーワードを5つずつ抽出してください。
+            ブランド "{brand_name}" (公式URL: {brand_url}) の戦略資料からオウンドメディアが目指すブランド像を示すキーワードを5つずつ抽出してください。
             
             [戦略資料テキスト]
             {pptx_text}
@@ -152,7 +153,6 @@ if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", typ
                 "required": ["core", "functional", "professional"]
             }
 
-            # 503混雑エラー対策：フェーズ1の自動リトライループ
             dictionary_data = None
             for attempt in range(3):
                 try:
@@ -173,7 +173,7 @@ if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", typ
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析
+            # Phase 2: 戦略的ギャップ分析とスコアリング
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -201,15 +201,25 @@ if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", typ
                             "required": ["word", "score", "category", "reason"]
                         }
                     },
-                    "consistency_score": {"type": "integer"}
+                    "radar_scores": {
+                        "type": "object",
+                        "properties": {
+                            "brand_philosophy": {"type": "integer"},
+                            "functional_value": {"type": "integer"},
+                            "emotional_engagement": {"type": "integer"},
+                            "safety_reputation": {"type": "integer"},
+                            "competitive_priority": {"type": "integer"}
+                        },
+                        "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
+                    }
                 },
-                "required": ["diagnosis_story", "topline", "improvement_actions", "ranking_data", "consistency_score"]
+                "required": ["diagnosis_story", "topline", "improvement_actions", "ranking_data", "radar_scores"]
             }
 
             prompt_analysis = f"""
-            Analyze Generative AI output data for "{brand_name}" (Official URL: {brand_url}) against the ideal dictionary.
+            Analyze Generative AI output data for "{brand_name}" (Official URL: {brand_url}) against the owned media keywords.
             
-            [IDEAL DICTIONARY]
+            [OWNED MEDIA KEYWORDS]
             {json.dumps(dictionary_data, ensure_ascii=False)}
             
             [GENERATIVE AI RANKING DATA (CSV)]
@@ -220,7 +230,7 @@ if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", typ
             
             TASK:
             1. "diagnosis_story": Write 3 fluent narrative paragraphs in Japanese (EACH strictly around 300 characters) without any inner titles or bullet points. Base your story on BOTH the quantitative CSV ranking data AND the qualitative DOCX brand evaluation.
-               - "match": Story of perfect alignments.
+               - "match": Story of perfect alignments with owned media.
                - "positive_gap": Story of unexpected positive perceptions in AI.
                - "negative_gap": Story of mismatches, outdated data, or issues in AI.
             2. "topline": Write a single-sentence summary (in Japanese) focusing on how to convert negative gaps to positive and how to amplify positive gaps in official communication.
@@ -228,14 +238,18 @@ if st.button("🚀 戦略ギャップ分析を実行（AI Strategy Scan）", typ
             4. "ranking_data": Classify at least 20 items (around 20-25 lines) from the ranking data into exactly one of these: "一致", "乖離（ポジティブ）", "乖離（ネガティブ）", or "その他".
                CRITICAL REQUIREMENT FOR "reason": 
                Do NOT write simple reasons. Explicitly and logically explain WHY that word falls into that classification in Japanese.
-               - For "一致": State exactly which part of the ideal brand strategy or dictionary keyword this word confirms.
+               - For "一致": State exactly which part of the owned media strategy this word confirms.
                - For "乖離（ポジティブ）": Explain why this unlisted word provides a new beneficial value, brand asset, or unexpected positive context.
                - For "乖離（ネガティブ）": Explain why this word indicates a misconception, outdated data issue, competitor overlap, or negative perception.
-            5. "consistency_score": (0-100 how much Generative AI data matches brand strategy).
+            5. "radar_scores": Score the Generative AI's perception of the brand on a scale of 0-100 for the following 5 criteria, based on how well it aligns with the owned media keywords and the provided brand evaluation.
+               - "brand_philosophy": ブランド理念の浸透度
+               - "functional_value": 機能価値の伝達度
+               - "emotional_engagement": 情緒的エンゲージメント
+               - "safety_reputation": ブランドの安全性と評判
+               - "competitive_priority": 対競合優先度
             Return JSON in Japanese.
             """
 
-            # 503混雑エラー対策
             final_data = None
             for attempt in range(3):
                 try:
@@ -280,8 +294,8 @@ if st.session_state.bas_result:
     # ==========================================
     # ① 現状診断：イメージの一致と乖離
     # ==========================================
-    st.markdown("### 🎯 ① 現状診断：イメージの一致と乖離")
-    st.caption("公式のブランド戦略が生成AIの回答にどう反映されているか、一致点と乖離の物語を300文字ずつのストーリーで紐解きます。")
+    st.markdown("### 🎯 ① 現状診断：オウンドメディアと生成AIのギャップ")
+    st.caption("オウンドメディアで発信している戦略が生成AIの回答にどう反映されているか、一致点と乖離の物語を紐解きます。")
     
     story = res.get("diagnosis_story", {})
     
@@ -301,64 +315,104 @@ if st.session_state.bas_result:
     st.divider()
 
     # ==========================================
-    # ② 生成AI言及の割合（ポートフォリオ）
+    # ② 生成AI上でのブランド評価（5軸スコア）
     # ==========================================
-    st.markdown("### 📊 ② 生成AI言及の割合（ポートフォリオ）")
-    st.caption("AI上における「一致」「ポジティブ乖離」「ネガティブ乖離」のシェア状況です。")
+    st.markdown("### 📊 ② 生成AI上でのブランド評価（5軸スコア）")
+    st.caption("オウンドメディアの戦略が生成AIにどの程度適応されているか、5つの軸で評価・採点した結果です。")
     
-    total_v = df['score'].sum()
-    m_val = df[df['category'] == '一致']['score'].sum()
-    p_val = df[df['category'] == '乖離（ポジティブ）']['score'].sum()
-    n_val = df[df['category'] == '乖離（ネガティブ）']['score'].sum()
-
-    match_p = (m_val / total_v * 100) if total_v > 0 else 0
-    pos_p = (p_val / total_v * 100) if total_v > 0 else 0
-    neg_p = (n_val / total_v * 100) if total_v > 0 else 0
-    other_p = max(0.0, 100 - (match_p + pos_p + neg_p))
-
-    p1 = match_p
-    p2 = p1 + pos_p
-    p3 = p2 + neg_p
-
-    col_chart, col_metric = st.columns([1, 1])
+    radar = res.get("radar_scores", {})
+    s_bp = radar.get("brand_philosophy", 0)
+    s_fv = radar.get("functional_value", 0)
+    s_ee = radar.get("emotional_engagement", 0)
+    s_sr = radar.get("safety_reputation", 0)
+    s_cp = radar.get("competitive_priority", 0)
     
-    with col_chart:
-        chart_html = f"""
-        <div style="display: flex; justify-content: center; align-items: center; height: 220px;">
-            <div style="
-                width: 180px; 
-                height: 180px; 
-                border-radius: 50%; 
-                background: conic-gradient(#28a745 0% {p1}%, #007bff {p1}% {p2}%, #dc3545 {p2}% {p3}%, #e2e8f0 {p3}% 100%);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            ">
-                <div style="
-                    width: 110px; 
-                    height: 110px; 
-                    border-radius: 50%; 
-                    background-color: white;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                    align-items: center;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                ">
-                    <span style="font-size: 12px; color: #64748b; font-weight: bold;">シンクロ率</span>
-                    <span style="font-size: 24px; color: #1e293b; font-weight: 800;">{res.get('consistency_score', 0)}%</span>
-                </div>
+    # 総合スコア（平均）
+    overall = sum([s_bp, s_fv, s_ee, s_sr, s_cp]) / 5.0
+    
+    # 点数に応じたカラースタイル判定関数
+    def get_color_style(score):
+        if score >= 75:
+            return "background-color:#d4edda; border:1px solid #c3e6cb; color:#155724;" # 緑
+        elif score >= 60:
+            return "background-color:#fff3cd; border:1px solid #ffeeba; color:#856404;" # 黄
+        else:
+            return "background-color:#f8d7da; border:1px solid #f5c6cb; color:#721c24;" # 赤
+
+    col_radar, col_metrics = st.columns([1, 1])
+    
+    with col_radar:
+        # 順番の定義
+        categories = ['ブランド理念の浸透度', '機能価値の伝達度', '情緒的エンゲージメント', 'ブランドの安全性と評判', '対競合優先度']
+        scores_list = [s_bp, s_fv, s_ee, s_sr, s_cp]
+        
+        # グラフを閉じるために先頭の要素を最後にもう一度追加
+        categories_closed = categories + [categories[0]]
+        scores_closed = scores_list + [scores_list[0]]
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+            r=scores_closed,
+            theta=categories_closed,
+            fill='toself',
+            name='Score',
+            line_color='#c55a11', # 濃いオレンジ
+            fillcolor='rgba(197, 90, 17, 0.2)' # 薄いオレンジ
+        ))
+        
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, 100], showticklabels=False), # メモリ数字は消してすっきり
+            ),
+            showlegend=False,
+            margin=dict(l=50, r=50, t=30, b=30),
+            height=350
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_metrics:
+        # ご提示の画像に寄せたカードレイアウト（HTML）
+        html_cards = f"""
+        <div style="margin-bottom:15px; padding:15px; border-radius:5px; {get_color_style(overall)}">
+            <div style="font-size:12px; margin-bottom:5px;">総合スコア</div>
+            <div style="font-size:32px; font-weight:bold;">{overall:.1f}</div>
+        </div>
+        
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_bp)}">
+                <div style="font-size:12px; margin-bottom:5px;">ブランド理念の浸透度</div>
+                <div style="font-size:24px; font-weight:bold;">{s_bp:.1f}</div>
+            </div>
+            <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_fv)}">
+                <div style="font-size:12px; margin-bottom:5px;">機能価値の伝達度</div>
+                <div style="font-size:24px; font-weight:bold;">{s_fv:.1f}</div>
             </div>
         </div>
+        
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_ee)}">
+                <div style="font-size:12px; margin-bottom:5px;">情緒的エンゲージメント</div>
+                <div style="font-size:24px; font-weight:bold;">{s_ee:.1f}</div>
+            </div>
+            <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_sr)}">
+                <div style="font-size:12px; margin-bottom:5px;">ブランドの安全性と評判</div>
+                <div style="font-size:24px; font-weight:bold;">{s_sr:.1f}</div>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:10px;">
+            <div style="flex:0.49; padding:15px; border-radius:5px; {get_color_style(s_cp)}">
+                <div style="font-size:12px; margin-bottom:5px;">対競合優先度</div>
+                <div style="font-size:24px; font-weight:bold;">{s_cp:.1f}</div>
+            </div>
+            <div style="flex:0.51;"></div>
+        </div>
+        
+        <div style="margin-top:10px; font-size:11px; color:#6c757d;">
+            色分け: 75点以上は緑、60-74点は黄、59点以下は赤。「オウンドメディアが目指す姿」が「AIの出力」にどれだけ色濃く反映されているかを評価します。
+        </div>
         """
-        st.html(chart_html)
-
-    with col_metric:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"🟢 :green[**一致（狙い通り）**]: `{match_p:.1f}%`")
-        st.markdown(f"🔵 :blue[**乖離（ポジティブ）**]: `{pos_p:.1f}%`")
-        st.markdown(f"🔴 :red[**乖離（ネガティブ）**]: `{neg_p:.1f}%`")
-        st.markdown(f"⚪ :gray[**その他**]: `{other_p:.1f}%`")
+        st.html(html_cards)
 
     st.divider()
 
@@ -398,7 +452,7 @@ if st.session_state.bas_result:
     st.dataframe(df_display.style.apply(highlight_display, axis=1), use_container_width=True, height=550, hide_index=True)
 
     # 参考情報
-    with st.expander("📄 参考：生成AI分析資料から抽出された理想のキーワード一覧"):
+    with st.expander("📄 参考：オウンドメディア（戦略資料）から抽出されたキーワード一覧"):
         d = res.get("dictionary", {})
         c1, c2, c3 = st.columns(3)
         with c1:
