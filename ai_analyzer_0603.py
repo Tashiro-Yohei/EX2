@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 # --- 1. アプリ設定 & UI ---
 st.set_page_config(page_title="AI Analyzer", layout="wide", initial_sidebar_state="expanded")
 
-# 画面の余白を最適化するカスタムCSS
+# 画面の余白最適化 ＆ PDF出力（印刷）用のカスタムCSS
 st.html("""
     <style>
         [data-testid="stSidebarHeader"] {
@@ -27,6 +27,22 @@ st.html("""
         .block-container {
             padding-top: 3.5rem !important; 
             padding-bottom: 2rem !important;
+        }
+        
+        /* 🖨️ PDF出力（印刷）時専用のスタイル */
+        @media print {
+            /* サイドバーや上部ヘッダーなど不要なメニューを非表示にする */
+            [data-testid="stSidebar"] { display: none !important; }
+            header[data-testid="stHeader"] { display: none !important; }
+            .no-print { display: none !important; }
+            /* 余白を詰めて広く使う */
+            .block-container { padding-top: 0rem !important; max-width: 100% !important; }
+            /* 背景色や枠線の色を強制的に印刷に反映させる */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
         }
     </style>
 """)
@@ -271,6 +287,15 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
 # --- 3. 結果表示 UI ---
 if st.session_state.bas_result:
     res = st.session_state.bas_result
+
+    # 🖨️ PDF出力ボタンの配置（分析結果の一番上に配置し、印刷時には消えるように設定）
+    st.html("""
+        <div class="no-print" style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+            <button onclick="window.print()" style="background-color: #475569; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s;">
+                📄 レポートをPDFで出力する
+            </button>
+        </div>
+    """)
 
     if debug_mode and res:
         with st.expander("🔧 開発者用デバッグログ"):
