@@ -50,16 +50,30 @@ st.html("""
                 print-color-adjust: exact !important;
             }
             
-            /* 👇追加：カラム崩れ・グラフ被りを防ぐ設定 */
+            /* カラム崩れ・グラフ被りを防ぐ設定 */
             [data-testid="stHorizontalBlock"] {
                 display: flex !important;
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
+                align-items: center !important;
             }
-            [data-testid="column"] {
-                width: 50% !important;
-                flex: 1 1 50% !important;
-                min-width: 0 !important; /* Plotlyグラフのはみ出しを防止 */
+            
+            /* 印刷時の左右幅の比率を固定（グラフ45% : カード55%） */
+            [data-testid="column"]:nth-of-type(1) {
+                width: 45% !important;
+                flex: 1 1 45% !important;
+                min-width: 0 !important; 
+            }
+            [data-testid="column"]:nth-of-type(2) {
+                width: 55% !important;
+                flex: 1 1 55% !important;
+                min-width: 0 !important;
+            }
+            
+            /* Plotlyの固定サイズSVGを枠内に強制的に収める */
+            .js-plotly-plot .plotly svg {
+                max-width: 100% !important;
+                height: auto !important;
             }
         }
     </style>
@@ -306,7 +320,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
 if st.session_state.bas_result:
     res = st.session_state.bas_result
 
-    # 🖨️ PDF出力ボタンの配置（Streamlitのiframe制限を回避する特別コンポーネントを使用）
+    # 🖨️ PDF出力ボタンの配置
     components.html("""
         <div style="display: flex; justify-content: flex-end; padding-right: 10px;">
             <button onclick="window.parent.print()" style="background-color: #475569; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-family: sans-serif;">
@@ -367,7 +381,8 @@ if st.session_state.bas_result:
         else:
             return "background-color:#f8d7da; border:1px solid #f5c6cb; color:#721c24;"
 
-    col_radar, col_metrics = st.columns([1, 1])
+    # ★変更点：カラムの比率をグラフ側を少し狭く、カード側を少し広く設定
+    col_radar, col_metrics = st.columns([1, 1.2])
     
     with col_radar:
         categories = ['ブランド理念の<br>浸透度', '機能価値の<br>伝達度', '情緒的<br>エンゲージメント', 'ブランドの<br>安全性と評判', '対競合優先度']
@@ -385,11 +400,12 @@ if st.session_state.bas_result:
             fillcolor='rgba(197, 90, 17, 0.2)'
         ))
         
+        # ★変更点：グラフ全体のサイズと余白をコンパクトに最適化
         fig.update_layout(
             polar=dict(radialaxis=dict(visible=True, range=[0, 100], showticklabels=False)),
             showlegend=False,
-            margin=dict(l=60, r=60, t=40, b=40),
-            height=380
+            margin=dict(l=30, r=30, t=30, b=30), 
+            height=320 
         )
         st.plotly_chart(fig, use_container_width=True)
 
