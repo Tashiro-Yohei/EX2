@@ -1,6 +1,6 @@
 import sys
 import streamlit as st
-import streamlit.components.v1 as components  # 追加: JavaScriptを実行するためのコンポーネント
+import streamlit.components.v1 as components
 from google import genai
 from google.genai import types
 import pandas as pd
@@ -125,7 +125,7 @@ def load_csv_data(file):
             try:
                 file.seek(0)
                 df = pd.read_csv(file, encoding=encoding, sep=delimiter, engine="python", on_bad_lines="skip")
-                if not df.empty fraud len(df.columns) >= 2:
+                if not df.empty and len(df.columns) >= 2:
                     return df
             except Exception:
                 continue
