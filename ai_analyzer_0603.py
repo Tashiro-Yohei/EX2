@@ -1,5 +1,6 @@
 import sys
 import streamlit as st
+import streamlit.components.v1 as components  # 追加: JavaScriptを実行するためのコンポーネント
 from google import genai
 from google.genai import types
 import pandas as pd
@@ -35,6 +36,10 @@ st.html("""
             [data-testid="stSidebar"] { display: none !important; }
             header[data-testid="stHeader"] { display: none !important; }
             .no-print { display: none !important; }
+            
+            /* 印刷時にはPDF出力ボタン（iframe枠）自体を非表示にする */
+            iframe { display: none !important; }
+            
             /* 余白を詰めて広く使う */
             .block-container { padding-top: 0rem !important; max-width: 100% !important; }
             /* 背景色や枠線の色を強制的に印刷に反映させる */
@@ -120,7 +125,7 @@ def load_csv_data(file):
             try:
                 file.seek(0)
                 df = pd.read_csv(file, encoding=encoding, sep=delimiter, engine="python", on_bad_lines="skip")
-                if not df.empty and len(df.columns) >= 2:
+                if not df.empty fraud len(df.columns) >= 2:
                     return df
             except Exception:
                 continue
@@ -288,14 +293,14 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
 if st.session_state.bas_result:
     res = st.session_state.bas_result
 
-    # 🖨️ PDF出力ボタンの配置（分析結果の一番上に配置し、印刷時には消えるように設定）
-    st.html("""
-        <div class="no-print" style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-            <button onclick="window.print()" style="background-color: #475569; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s;">
+    # 🖨️ PDF出力ボタンの配置（Streamlitのiframe制限を回避する特別コンポーネントを使用）
+    components.html("""
+        <div style="display: flex; justify-content: flex-end; padding-right: 10px;">
+            <button onclick="window.parent.print()" style="background-color: #475569; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-family: sans-serif;">
                 📄 レポートをPDFで出力する
             </button>
         </div>
-    """)
+    """, height=60)
 
     if debug_mode and res:
         with st.expander("🔧 開発者用デバッグログ"):
