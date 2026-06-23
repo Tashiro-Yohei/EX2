@@ -49,32 +49,6 @@ st.html("""
                 color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-            
-            /* カラム崩れ・グラフ被りを防ぐ設定 */
-            [data-testid="stHorizontalBlock"] {
-                display: flex !important;
-                flex-direction: row !important;
-                flex-wrap: nowrap !important;
-                align-items: center !important;
-            }
-            
-            /* 印刷時の左右幅の比率を固定（グラフ45% : カード55%） */
-            [data-testid="column"]:nth-of-type(1) {
-                width: 45% !important;
-                flex: 1 1 45% !important;
-                min-width: 0 !important; 
-            }
-            [data-testid="column"]:nth-of-type(2) {
-                width: 55% !important;
-                flex: 1 1 55% !important;
-                min-width: 0 !important;
-            }
-            
-            /* Plotlyの固定サイズSVGを枠内に強制的に収める */
-            .js-plotly-plot .plotly svg {
-                max-width: 100% !important;
-                height: auto !important;
-            }
         }
     </style>
 """)
@@ -381,8 +355,8 @@ if st.session_state.bas_result:
         else:
             return "background-color:#f8d7da; border:1px solid #f5c6cb; color:#721c24;"
 
-    # ★変更点：カラムの比率をグラフ側を少し狭く、カード側を少し広く設定
-    col_radar, col_metrics = st.columns([1, 1.2])
+    # 左右比率を「1:1（均等）」に復元
+    col_radar, col_metrics = st.columns([1, 1])
     
     with col_radar:
         categories = ['ブランド理念の<br>浸透度', '機能価値の<br>伝達度', '情緒的<br>エンゲージメント', 'ブランドの<br>安全性と評判', '対競合優先度']
@@ -400,12 +374,12 @@ if st.session_state.bas_result:
             fillcolor='rgba(197, 90, 17, 0.2)'
         ))
         
-        # ★変更点：グラフ全体のサイズと余白をコンパクトに最適化
+        # グラフのサイズ（height=380）と余白を元の大きさに復元
         fig.update_layout(
             polar=dict(radialaxis=dict(visible=True, range=[0, 100], showticklabels=False)),
             showlegend=False,
-            margin=dict(l=30, r=30, t=30, b=30), 
-            height=320 
+            margin=dict(l=60, r=60, t=40, b=40), 
+            height=380 
         )
         st.plotly_chart(fig, use_container_width=True)
 
