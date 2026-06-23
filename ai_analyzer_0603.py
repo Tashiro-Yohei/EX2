@@ -42,11 +42,24 @@ st.html("""
             
             /* 余白を詰めて広く使う */
             .block-container { padding-top: 0rem !important; max-width: 100% !important; }
+            
             /* 背景色や枠線の色を強制的に印刷に反映させる */
             * {
                 -webkit-print-color-adjust: exact !important;
                 color-adjust: exact !important;
                 print-color-adjust: exact !important;
+            }
+            
+            /* 👇追加：カラム崩れ・グラフ被りを防ぐ設定 */
+            [data-testid="stHorizontalBlock"] {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+            }
+            [data-testid="column"] {
+                width: 50% !important;
+                flex: 1 1 50% !important;
+                min-width: 0 !important; /* Plotlyグラフのはみ出しを防止 */
             }
         }
     </style>
