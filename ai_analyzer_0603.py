@@ -185,7 +185,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング（★詳細分析の指示を具体的に強化）
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★詳細分析の指示から「自社は〜」の推測を排除）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -268,11 +268,11 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "negative_gap": What misconceptions or weak points exist in the AI's understanding?
             2. "topline": Write a single-sentence summary strategy for executives.
             3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
-            4. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC discrepancies (gaps) between the owned media intent and the AI's understanding. 
-               CRITICAL INSTRUCTION: You MUST avoid generic business advice. Every item MUST explicitly quote a specific keyword from [OWNED MEDIA KEYWORDS] and contrast it directly with specific data points, quotes, or ranks from [GENERATIVE AI RANKING DATA] or [GENERATIVE AI BRAND EVALUATION].
-               - "issue": Detail the gap by citing specific terms (e.g., "自社は『〇〇』というキーワードを重視しているが、AIの回答データでは『△△』と出力されており、関連づけられていない").
+            4. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements in the Generative AI's understanding. 
+               CRITICAL INSTRUCTION: Do NOT explicitly assert or guess the company's intended message (e.g., absolutely DO NOT write "自社は『〇〇』と発信しているが..."). If you misinterpret the company's intent, it will ruin the credibility of the report. Instead, focus entirely on what the AI currently outputs. Every item MUST explicitly quote specific data points, quotes, or ranks from [GENERATIVE AI RANKING DATA] or [GENERATIVE AI BRAND EVALUATION].
+               - "issue": Detail the specific AI perception issue based ONLY on the provided AI data (e.g., "AIの回答データにおいて、『△△』という評価が目立っており、〇〇の側面への言及が欠落している").
                - "impact": Explain the specific business impact tailored to THIS brand's actual product and market.
-               - "solution": Provide a concrete, highly specific PR/Marketing action to fix this exact gap. Do NOT say "SNSで発信する" or "コンテンツを増やす". Suggest specific messaging changes, SEO adjustments for AI, or specific content angles based on the data.
+               - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap. Do NOT say "SNSで発信する" or "コンテンツを増やす". Suggest specific messaging changes, SEO adjustments for AI, or specific content angles based on the data.
             5. "radar_quantity", "radar_quality" & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
                - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
                - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
