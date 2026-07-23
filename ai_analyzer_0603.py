@@ -185,7 +185,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング（★ここを量的・質的乖離に変更）
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★詳細分析のスキーマを追加）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -200,6 +200,18 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                     },
                     "topline": {"type": "string"},
                     "improvement_actions": {"type": "array", "items": {"type": "string"}},
+                    "detailed_discrepancies": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "issue": {"type": "string"},
+                                "impact": {"type": "string"},
+                                "solution": {"type": "string"}
+                            },
+                            "required": ["issue", "impact", "solution"]
+                        }
+                    },
                     "radar_quantity": {
                         "type": "object",
                         "properties": {
@@ -234,7 +246,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
                     }
                 },
-                "required": ["diagnosis_story", "topline", "improvement_actions", "radar_quantity", "radar_quality", "radar_reasons"]
+                "required": ["diagnosis_story", "topline", "improvement_actions", "detailed_discrepancies", "radar_quantity", "radar_quality", "radar_reasons"]
             }
 
             prompt_analysis = f"""
@@ -256,9 +268,10 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "negative_gap": What misconceptions or weak points exist in the AI's understanding?
             2. "topline": Write a single-sentence summary strategy for executives.
             3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
-            4. "radar_quantity", "radar_quality" & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
-               - "radar_quantity" (量的乖離): Estimate the % probability (0-100) that the AI's answer diverges from the owned media (e.g., Out of 100 answers, how many are different?).
-               - "radar_quality" (質的乖離): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
+            4. "detailed_discrepancies": Identify up to 10 specific, detailed discrepancies (gaps) between the owned media intent and the AI's understanding that have a HIGH business impact. For each, provide the "issue" (the specific gap in Japanese), the "impact" (why it negatively or positively impacts the business), and the "solution" (actionable advice to fix or leverage it). This section must demonstrate a deep, meticulous analysis of the data.
+            5. "radar_quantity", "radar_quality" & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
+               - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media (e.g., Out of 100 answers, how many align with the brand intent?).
+               - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
                CRITICAL for "radar_reasons": Provide a DETAILED business reason (approx. 150-200 characters in Japanese) explaining BOTH the quantity and quality scores based on the data.
                Criteria:
                - "brand_philosophy": ブランド理念
@@ -341,7 +354,7 @@ if st.session_state.bas_result:
     # ② 生成AIからのブランド評価（量的乖離・質的乖離）
     # ==========================================
     st.markdown("### 📊 ② 生成AIからのブランド評価（2軸による乖離分析）")
-    st.caption("AIの認識ズレを「どれくらいの頻度で起こるか（量的乖離）」と「自社発信とどれくらい内容が違うか（質的乖離）」の2軸（単位：％）で可視化しています。")
+    st.caption("AIの認識ズレを「どれくらいの頻度で一致するか（量的乖離）」と「自社発信とどれくらい内容が似ているか（質的乖離）」の2軸（単位：％）で可視化しています。")
     
     q_qty = res.get("radar_quantity", {})
     q_qual = res.get("radar_quality", {})
@@ -360,15 +373,15 @@ if st.session_state.bas_result:
     col_qty, col_qual = st.columns(2)
     
     with col_qty:
-        st.markdown("<div style='text-align:center; font-weight:bold; color:#c5221f;'>① 量的乖離（自社と異なる回答になる確率：％）</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; font-weight:bold; color:#1a73e8;'>① 量的乖離（自社発信と一致する確率：％）</div>", unsafe_allow_html=True)
         fig_qty = go.Figure()
         fig_qty.add_trace(go.Scatterpolar(
             r=qty_closed,
             theta=categories_closed,
             fill='toself',
             name='量的乖離',
-            line_color='#d9534f',
-            fillcolor='rgba(217, 83, 79, 0.2)'
+            line_color='#1a73e8',
+            fillcolor='rgba(26, 115, 232, 0.2)'
         ))
         fig_qty.update_layout(
             polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
@@ -411,8 +424,8 @@ if st.session_state.bas_result:
                 🔹 {title}
             </div>
             <div style="display: flex; gap: 15px; margin-bottom: 10px;">
-                <div style="background-color: #fce8e6; padding: 4px 10px; border-radius: 4px; font-size: 13px; color: #c5221f; font-weight: bold;">
-                    量的乖離（ズレる確率）: {qty_val}%
+                <div style="background-color: #e8f0fe; padding: 4px 10px; border-radius: 4px; font-size: 13px; color: #1a73e8; font-weight: bold;">
+                    量的乖離（一致確率）: {qty_val}%
                 </div>
                 <div style="background-color: #e6f4ea; padding: 4px 10px; border-radius: 4px; font-size: 13px; color: #137333; font-weight: bold;">
                     質的乖離（内容の類似度）: {qual_val}%
@@ -446,6 +459,39 @@ if st.session_state.bas_result:
             </div>
         </div>
         """)
+        
+    st.divider()
+
+    # ==========================================
+    # ④ 重要な乖離の詳細と解決策 (★新規追加)
+    # ==========================================
+    st.markdown("### 🔍 ④ 重要な乖離の詳細と解決策")
+    st.caption("細かなデータ分析に基づき、ビジネスへの影響が大きい乖離ポイントを深掘りし、具体的な解決策の糸口を提示します。")
+    
+    discrepancies = res.get("detailed_discrepancies", [])
+    if discrepancies:
+        for item in discrepancies:
+            issue = item.get("issue", "")
+            impact = item.get("impact", "")
+            solution = item.get("solution", "")
+            
+            st.html(f"""
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 15px; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-weight: bold; color: #b91c1c; font-size: 16px; margin-bottom: 10px; display: flex; align-items: center;">
+                    <span style="margin-right: 8px; font-size: 18px;">⚠️</span> 乖離: {issue}
+                </div>
+                <div style="font-size: 14px; color: #334155; margin-bottom: 12px; padding-left: 26px;">
+                    <span style="font-weight: bold; color: #475569; display: block; margin-bottom: 4px;">💥 ビジネスへの影響:</span>
+                    {impact}
+                </div>
+                <div style="font-size: 14px; color: #334155; padding-top: 12px; padding-left: 26px; border-top: 1px dashed #cbd5e1;">
+                    <span style="font-weight: bold; color: #0284c7; display: block; margin-bottom: 4px;">💡 解決へのアドバイス:</span>
+                    {solution}
+                </div>
+            </div>
+            """)
+    else:
+        st.write("重要な乖離は見つかりませんでした。")
         
     st.divider()
 
