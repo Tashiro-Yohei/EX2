@@ -32,18 +32,11 @@ st.html("""
         
         /* 🖨️ PDF出力（印刷）時専用のスタイル */
         @media print {
-            /* サイドバーや上部ヘッダーなど不要なメニューを非表示にする */
             [data-testid="stSidebar"] { display: none !important; }
             header[data-testid="stHeader"] { display: none !important; }
             .no-print { display: none !important; }
-            
-            /* 印刷時にはPDF出力ボタン（iframe枠）自体を非表示にする */
             iframe { display: none !important; }
-            
-            /* 余白を詰めて広く使う */
             .block-container { padding-top: 0rem !important; max-width: 100% !important; }
-            
-            /* 背景色や枠線の色を強制的に印刷に反映させる */
             * {
                 -webkit-print-color-adjust: exact !important;
                 color-adjust: exact !important;
@@ -192,7 +185,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★ここを量的・質的乖離に変更）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -207,7 +200,18 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                     },
                     "topline": {"type": "string"},
                     "improvement_actions": {"type": "array", "items": {"type": "string"}},
-                    "radar_scores": {
+                    "radar_quantity": {
+                        "type": "object",
+                        "properties": {
+                            "brand_philosophy": {"type": "integer"},
+                            "functional_value": {"type": "integer"},
+                            "emotional_engagement": {"type": "integer"},
+                            "safety_reputation": {"type": "integer"},
+                            "competitive_priority": {"type": "integer"}
+                        },
+                        "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
+                    },
+                    "radar_quality": {
                         "type": "object",
                         "properties": {
                             "brand_philosophy": {"type": "integer"},
@@ -230,7 +234,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
                     }
                 },
-                "required": ["diagnosis_story", "topline", "improvement_actions", "radar_scores", "radar_reasons"]
+                "required": ["diagnosis_story", "topline", "improvement_actions", "radar_quantity", "radar_quality", "radar_reasons"]
             }
 
             prompt_analysis = f"""
@@ -246,19 +250,22 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
             {docx_text}
             
             TASK:
-            1. "diagnosis_story": Write 3 fluent narrative paragraphs in Japanese (EACH strictly around 200-250 characters) aimed at business executives. Use clear, accessible language.
+            1. "diagnosis_story": Write 3 fluent narrative paragraphs in Japanese (EACH strictly around 200-250 characters) aimed at business executives.
                - "match": What aspects of the company's message are correctly understood by the AI?
-               - "positive_gap": What unexpected strengths or positive perceptions did the AI find that the company isn't heavily promoting?
-               - "negative_gap": What misconceptions or weak points exist in the AI's understanding compared to the company's intent?
+               - "positive_gap": What unexpected strengths or positive perceptions did the AI find?
+               - "negative_gap": What misconceptions or weak points exist in the AI's understanding?
             2. "topline": Write a single-sentence summary strategy for executives.
-            3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps to turn weaknesses into strengths or to leverage unexpected positive perceptions. Make them highly specific.
-            4. "radar_scores" & "radar_reasons": Score the Generative AI's perception on a scale of 0-100 for the following 5 criteria. 
-               CRITICAL for "radar_reasons": Provide a DETAILED business reason (approx. 150-200 characters in Japanese, 2-3 sentences) explaining WHY it got this score based on the data. Explicitly mention what specific keywords/evaluations raised or lowered the score.
-               - "brand_philosophy": ブランド理念の浸透度
-               - "functional_value": 機能価値の伝達度
-               - "emotional_engagement": 情緒的エンゲージメント（顧客の愛着度）
-               - "safety_reputation": ブランドの安全性と評判
-               - "competitive_priority": 対競合優先度（他社と比べた選ばれやすさ）
+            3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
+            4. "radar_quantity", "radar_quality" & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
+               - "radar_quantity" (量的乖離): Estimate the % probability (0-100) that the AI's answer diverges from the owned media (e.g., Out of 100 answers, how many are different?).
+               - "radar_quality" (質的乖離): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
+               CRITICAL for "radar_reasons": Provide a DETAILED business reason (approx. 150-200 characters in Japanese) explaining BOTH the quantity and quality scores based on the data.
+               Criteria:
+               - "brand_philosophy": ブランド理念
+               - "functional_value": 機能価値
+               - "emotional_engagement": 情緒的エンゲージメント
+               - "safety_reputation": 安全性と評判
+               - "competitive_priority": 対競合優先度
             Return JSON in Japanese.
             """
 
@@ -331,118 +338,88 @@ if st.session_state.bas_result:
     st.divider()
 
     # ==========================================
-    # ② 生成AIからのブランド評価（5つの重要指標）
+    # ② 生成AIからのブランド評価（量的乖離・質的乖離）
     # ==========================================
-    st.markdown("### 📊 ② 生成AIからのブランド評価（5つの重要指標）")
-    st.caption("自社のブランド戦略がAIにどの程度評価され、浸透しているかを5つの軸で採点した結果とその理由です。")
+    st.markdown("### 📊 ② 生成AIからのブランド評価（2軸による乖離分析）")
+    st.caption("AIの認識ズレを「どれくらいの頻度で起こるか（量的乖離）」と「自社発信とどれくらい内容が違うか（質的乖離）」の2軸（単位：％）で可視化しています。")
     
-    radar = res.get("radar_scores", {})
+    q_qty = res.get("radar_quantity", {})
+    q_qual = res.get("radar_quality", {})
     reasons = res.get("radar_reasons", {})
     
-    s_bp = radar.get("brand_philosophy", 0)
-    s_fv = radar.get("functional_value", 0)
-    s_ee = radar.get("emotional_engagement", 0)
-    s_sr = radar.get("safety_reputation", 0)
-    s_cp = radar.get("competitive_priority", 0)
+    categories = ['ブランド理念', '機能価値', '情緒的<br>エンゲージメント', '安全性と評判', '対競合優先度']
+    categories_closed = categories + [categories[0]]
     
-    overall = sum([s_bp, s_fv, s_ee, s_sr, s_cp]) / 5.0
+    keys = ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
+    qty_scores = [q_qty.get(k, 0) for k in keys]
+    qual_scores = [q_qual.get(k, 0) for k in keys]
     
-    def get_color_style(score):
-        if score >= 75:
-            return "background-color:#d4edda; border:1px solid #c3e6cb; color:#155724;"
-        elif score >= 60:
-            return "background-color:#fff3cd; border:1px solid #ffeeba; color:#856404;"
-        else:
-            return "background-color:#f8d7da; border:1px solid #f5c6cb; color:#721c24;"
+    qty_closed = qty_scores + [qty_scores[0]]
+    qual_closed = qual_scores + [qual_scores[0]]
 
-    # 左右比率を「1:1（均等）」に復元
-    col_radar, col_metrics = st.columns([1, 1])
+    col_qty, col_qual = st.columns(2)
     
-    with col_radar:
-        categories = ['ブランド理念の<br>浸透度', '機能価値の<br>伝達度', '情緒的<br>エンゲージメント', 'ブランドの<br>安全性と評判', '対競合優先度']
-        scores_list = [s_bp, s_fv, s_ee, s_sr, s_cp]
-        categories_closed = categories + [categories[0]]
-        scores_closed = scores_list + [scores_list[0]]
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(
-            r=scores_closed,
+    with col_qty:
+        st.markdown("<div style='text-align:center; font-weight:bold; color:#c5221f;'>① 量的乖離（自社と異なる回答になる確率：％）</div>", unsafe_allow_html=True)
+        fig_qty = go.Figure()
+        fig_qty.add_trace(go.Scatterpolar(
+            r=qty_closed,
             theta=categories_closed,
             fill='toself',
-            name='Score',
-            line_color='#c55a11',
-            fillcolor='rgba(197, 90, 17, 0.2)'
+            name='量的乖離',
+            line_color='#d9534f',
+            fillcolor='rgba(217, 83, 79, 0.2)'
         ))
-        
-        # グラフのサイズ（height=380）と余白を元の大きさに復元
-        fig.update_layout(
-            polar=dict(radialaxis=dict(visible=True, range=[0, 100], showticklabels=False)),
+        fig_qty.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
             showlegend=False,
-            margin=dict(l=60, r=60, t=40, b=40), 
-            height=380 
+            margin=dict(l=50, r=50, t=30, b=30),
+            height=380
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_qty, use_container_width=True)
 
-    with col_metrics:
-        html_cards = f"""
-        <div style="margin-bottom:15px; padding:15px; border-radius:5px; {get_color_style(overall)}">
-            <div style="font-size:12px; margin-bottom:5px;">総合スコア</div>
-            <div style="font-size:32px; font-weight:bold;">{overall:.1f}</div>
-        </div>
-        <div style="display:flex; gap:10px; margin-bottom:10px;">
-            <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_bp)}">
-                <div style="font-size:12px; margin-bottom:5px;">ブランド理念の浸透度</div>
-                <div style="font-size:24px; font-weight:bold;">{s_bp:.1f}</div>
-            </div>
-            <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_fv)}">
-                <div style="font-size:12px; margin-bottom:5px;">機能価値の伝達度</div>
-                <div style="font-size:24px; font-weight:bold;">{s_fv:.1f}</div>
-            </div>
-        </div>
-        <div style="display:flex; gap:10px; margin-bottom:10px;">
-            <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_ee)}">
-                <div style="font-size:12px; margin-bottom:5px;">情緒的エンゲージメント</div>
-                <div style="font-size:24px; font-weight:bold;">{s_ee:.1f}</div>
-            </div>
-            <div style="flex:1; padding:15px; border-radius:5px; {get_color_style(s_sr)}">
-                <div style="font-size:12px; margin-bottom:5px;">ブランドの安全性と評判</div>
-                <div style="font-size:24px; font-weight:bold;">{s_sr:.1f}</div>
-            </div>
-        </div>
-        <div style="display:flex; gap:10px;">
-            <div style="flex:0.49; padding:15px; border-radius:5px; {get_color_style(s_cp)}">
-                <div style="font-size:12px; margin-bottom:5px;">対競合優先度</div>
-                <div style="font-size:24px; font-weight:bold;">{s_cp:.1f}</div>
-            </div>
-            <div style="flex:0.51;"></div>
-        </div>
-        """
-        st.html(html_cards)
+    with col_qual:
+        st.markdown("<div style='text-align:center; font-weight:bold; color:#137333;'>② 質的乖離（自社発信と内容の類似度：％）</div>", unsafe_allow_html=True)
+        fig_qual = go.Figure()
+        fig_qual.add_trace(go.Scatterpolar(
+            r=qual_closed,
+            theta=categories_closed,
+            fill='toself',
+            name='質的乖離',
+            line_color='#28a745',
+            fillcolor='rgba(40, 167, 69, 0.2)'
+        ))
+        fig_qual.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
+            showlegend=False,
+            margin=dict(l=50, r=50, t=30, b=30),
+            height=380
+        )
+        st.plotly_chart(fig_qual, use_container_width=True)
 
     # 評価理由をカード型デザインで表示
-    st.markdown("#### 📝 各スコアの評価理由（なぜこの点数になったのか）")
+    st.markdown("#### 📝 各項目の評価詳細（なぜこの数値になったのか）")
     
-    for title, key, score in [
-        ("ブランド理念の浸透度", "brand_philosophy", s_bp),
-        ("機能価値の伝達度", "functional_value", s_fv),
-        ("情緒的エンゲージメント", "emotional_engagement", s_ee),
-        ("ブランドの安全性と評判", "safety_reputation", s_sr),
-        ("対競合優先度", "competitive_priority", s_cp)
-    ]:
-        if score >= 75:
-            b_color, bg_color, icon = "#28a745", "#f4fcf5", "🟢"
-        elif score >= 60:
-            b_color, bg_color, icon = "#ffc107", "#fffdf5", "🟡"
-        else:
-            b_color, bg_color, icon = "#dc3545", "#fff5f5", "🔴"
+    for title, key in zip(['ブランド理念の浸透度', '機能価値の伝達度', '情緒的エンゲージメント', 'ブランドの安全性と評判', '対競合優先度'], keys):
+        qty_val = q_qty.get(key, 0)
+        qual_val = q_qual.get(key, 0)
+        reason = reasons.get(key, 'データなし')
         
         st.html(f"""
-        <div style="border-left: 5px solid {b_color}; background-color: {bg_color}; padding: 15px; margin-bottom: 12px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-            <div style="font-weight: bold; font-size: 16px; margin-bottom: 6px; color: #333;">
-                {icon} {title} <span style="color: {b_color}; font-size: 18px; margin-left: 5px;">{score}点</span>
+        <div style="border-left: 5px solid #007bff; background-color: #f8f9fa; padding: 15px; margin-bottom: 12px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: #333;">
+                🔹 {title}
+            </div>
+            <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+                <div style="background-color: #fce8e6; padding: 4px 10px; border-radius: 4px; font-size: 13px; color: #c5221f; font-weight: bold;">
+                    量的乖離（ズレる確率）: {qty_val}%
+                </div>
+                <div style="background-color: #e6f4ea; padding: 4px 10px; border-radius: 4px; font-size: 13px; color: #137333; font-weight: bold;">
+                    質的乖離（内容の類似度）: {qual_val}%
+                </div>
             </div>
             <div style="font-size: 14px; color: #555; line-height: 1.6;">
-                {reasons.get(key, 'データなし')}
+                {reason}
             </div>
         </div>
         """)
