@@ -48,7 +48,7 @@ st.html("""
                 display: flex !important;
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
-                align-items: center !important;
+                align-items: flex-start !important;
             }
             [data-testid="column"] {
                 min-width: 0 !important;
@@ -202,7 +202,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング（★項目を更新し、競合分析を追加）
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★競合分析スキーマを3軸比較+優位・劣位に変更）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -219,13 +219,14 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                     "competitive_analysis": {
                         "type": "object",
                         "properties": {
-                            "score": {"type": "integer"},
-                            "current_status": {"type": "string"},
-                            "advantage": {"type": "string"},
-                            "disadvantage": {"type": "string"},
+                            "mention_volume_comparison": {"type": "string"},
+                            "mention_order_comparison": {"type": "string"},
+                            "mention_content_comparison": {"type": "string"},
+                            "superior_competitors": {"type": "array", "items": {"type": "string"}},
+                            "inferior_competitors": {"type": "array", "items": {"type": "string"}},
                             "strategic_advice": {"type": "string"}
                         },
-                        "required": ["score", "current_status", "advantage", "disadvantage", "strategic_advice"]
+                        "required": ["mention_volume_comparison", "mention_order_comparison", "mention_content_comparison", "superior_competitors", "inferior_competitors", "strategic_advice"]
                     },
                     "improvement_actions": {"type": "array", "items": {"type": "string"}},
                     "detailed_discrepancies": {
@@ -297,18 +298,19 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "positive_gap": What unexpected strengths or positive perceptions did the AI find?
                - "negative_gap": What misconceptions or weak points exist in the AI's understanding?
             2. "topline": Write a single-sentence summary strategy for executives.
-            3. "competitive_analysis": Analyze how the AI perceives the brand relative to its competitors based ONLY on the provided data.
-               - "score": Estimate a competitive priority score (0-100) indicating how often the AI recommends this brand over others.
-               - "current_status": Describe the brand's current competitive standing in the AI's responses (approx 100 characters).
-               - "advantage": What specific advantage does the AI highlight over competitors?
-               - "disadvantage": What specific weakness does the AI highlight compared to competitors?
-               - "strategic_advice": Provide one highly specific strategic action to improve the brand's AI ranking/recommendation rate against competitors.
+            3. "competitive_analysis": Analyze how the AI perceives the brand relative to its competitors based ONLY on the provided data. DO NOT USE NUMERICAL SCORES.
+               - "mention_volume_comparison": 言及の多さの比較 (Compare the frequency/volume of mentions of this brand versus competitors in the data. Around 80-100 characters).
+               - "mention_order_comparison": 言及順番の比較 (Compare the ranking or order in which this brand is mentioned versus competitors. Are competitors mentioned first? Around 80-100 characters).
+               - "mention_content_comparison": 言及内容の比較 (Compare the qualitative content/context of mentions. How does the AI describe this brand compared to competitors? Around 80-100 characters).
+               - "superior_competitors": List specific competitor names (array of strings) that are positioned better (more frequent, higher order, better context) than this brand.
+               - "inferior_competitors": List specific competitor names (array of strings) that are positioned worse than this brand.
+               - "strategic_advice": Provide one highly specific strategic action to improve the brand's position against the specific competitors mentioned.
             4. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
             5. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements in the Generative AI's understanding. 
-               CRITICAL INSTRUCTION: Do NOT explicitly assert or guess the company's intended message (e.g., absolutely DO NOT write "自社は『〇〇』と発信しているが..."). If you misinterpret the company's intent, it will ruin the credibility of the report. Instead, focus entirely on what the AI currently outputs. Every item MUST explicitly quote specific data points, quotes, or ranks from [GENERATIVE AI RANKING DATA] or [GENERATIVE AI BRAND EVALUATION].
+               CRITICAL INSTRUCTION: Do NOT explicitly assert or guess the company's intended message. Focus entirely on what the AI currently outputs. Every item MUST explicitly quote specific data points, quotes, or ranks from [GENERATIVE AI RANKING DATA] or [GENERATIVE AI BRAND EVALUATION].
                - "issue": Detail the specific AI perception issue based ONLY on the provided AI data.
                - "impact": Explain the specific business impact tailored to THIS brand's actual product and market.
-               - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap. Do NOT say "SNSで発信する" or "コンテンツを増やす".
+               - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap.
             6. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
                - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
                - "radar_quantity_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the quantitative radar chart.
@@ -404,7 +406,6 @@ if st.session_state.bas_result:
     qual_summary = res.get("radar_quality_summary", "サマリーデータがありません。")
     reasons = res.get("radar_reasons", {})
     
-    # ★ 競合優先度を削除し、利用シーン・モーメントに変更
     categories = ['ブランド理念', '機能価値', '情緒的<br>エンゲージメント', '安全性と評判', '利用シーン・<br>モーメント']
     categories_closed = categories + [categories[0]]
     
@@ -433,9 +434,8 @@ if st.session_state.bas_result:
             polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
             showlegend=False,
             margin=dict(l=40, r=40, t=30, b=30),
-            height=320 # A4横幅に確実に収めるため少しコンパクトに
+            height=320 
         )
-        # config={'staticPlot': True} で画像化（はみ出し防止）
         st.plotly_chart(fig_qty, use_container_width=True, config={'staticPlot': True})
         
     with col_summary1:
@@ -470,9 +470,8 @@ if st.session_state.bas_result:
             polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
             showlegend=False,
             margin=dict(l=40, r=40, t=30, b=30),
-            height=320 # A4横幅に確実に収めるため少しコンパクトに
+            height=320
         )
-        # config={'staticPlot': True} で画像化（はみ出し防止）
         st.plotly_chart(fig_qual, use_container_width=True, config={'staticPlot': True})
         
     with col_summary2:
@@ -519,46 +518,52 @@ if st.session_state.bas_result:
     st.divider()
     
     # ==========================================
-    # ③ 対競合優先度の分析（★新設）
+    # ③ 対競合優先度の分析（★スコア廃止・比較軸に変更）
     # ==========================================
     st.markdown("### ⚔️ ③ 対競合優先度の分析")
-    st.caption("AIの回答データ内において、自社が競合他社と比較してどれだけ優先的に推奨・言及されているかを分析します。")
+    st.caption("AIの回答データ内において、自社が競合他社と比較してどのように言及され、どのようなポジションにいるかを分析します。")
     
     comp_data = res.get("competitive_analysis", {})
-    comp_score = comp_data.get("score", 0)
+    vol_comp = comp_data.get("mention_volume_comparison", "データなし")
+    order_comp = comp_data.get("mention_order_comparison", "データなし")
+    content_comp = comp_data.get("mention_content_comparison", "データなし")
     
-    # スコアに応じたカラー設定
-    if comp_score >= 75:
-        c_bg, c_border, c_text = "#d4edda", "#c3e6cb", "#155724"
-    elif comp_score >= 60:
-        c_bg, c_border, c_text = "#fff3cd", "#ffeeba", "#856404"
-    else:
-        c_bg, c_border, c_text = "#f8d7da", "#f5c6cb", "#721c24"
-        
+    sup_comp = ", ".join(comp_data.get("superior_competitors", []))
+    inf_comp = ", ".join(comp_data.get("inferior_competitors", []))
+    
+    if not sup_comp: sup_comp = "特になし"
+    if not inf_comp: inf_comp = "特になし"
+    
     st.html(f"""
     <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-        <div style="flex: 0 0 200px; background-color: {c_bg}; border: 1px solid {c_border}; border-radius: 8px; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
-            <div style="font-size: 14px; color: {c_text}; font-weight: bold; margin-bottom: 5px;">対競合 推奨スコア</div>
-            <div style="font-size: 42px; font-weight: bold; color: {c_text};">{comp_score}</div>
+        <div style="flex: 1; border-top: 4px solid #dc3545; background-color: #fff5f5; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="font-weight: bold; color: #dc3545; margin-bottom: 8px; font-size: 14px;">⚠️ 自社より優位に立っている競合</div>
+            <div style="font-size: 18px; font-weight: bold; color: #333;">{sup_comp}</div>
         </div>
-        <div style="flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; background-color: #ffffff;">
-            <div style="font-size: 14px; color: #64748b; font-weight: bold; margin-bottom: 5px;">現在のポジション</div>
-            <div style="font-size: 16px; color: #334155; line-height: 1.5;">{comp_data.get('current_status', 'データなし')}</div>
-        </div>
-    </div>
-    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-        <div style="flex: 1; border-top: 4px solid #28a745; background-color: #f8f9fa; padding: 15px; border-radius: 4px;">
-            <div style="font-weight: bold; color: #28a745; margin-bottom: 8px;">✨ 競合に対する強み (Advantage)</div>
-            <div style="font-size: 14px; color: #333;">{comp_data.get('advantage', 'データなし')}</div>
-        </div>
-        <div style="flex: 1; border-top: 4px solid #dc3545; background-color: #f8f9fa; padding: 15px; border-radius: 4px;">
-            <div style="font-weight: bold; color: #dc3545; margin-bottom: 8px;">⚠️ 競合に対する弱み (Disadvantage)</div>
-            <div style="font-size: 14px; color: #333;">{comp_data.get('disadvantage', 'データなし')}</div>
+        <div style="flex: 1; border-top: 4px solid #28a745; background-color: #f4fcf5; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="font-weight: bold; color: #28a745; margin-bottom: 8px; font-size: 14px;">✨ 自社が優位に立っている競合</div>
+            <div style="font-size: 18px; font-weight: bold; color: #333;">{inf_comp}</div>
         </div>
     </div>
-    <div style="background-color: #e8f0fe; border-left: 5px solid #1a73e8; padding: 15px; border-radius: 4px;">
+    
+    <div style="margin-bottom: 20px;">
+        <div style="border-left: 4px solid #475569; background-color: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 0 4px 4px 0;">
+            <div style="font-weight: bold; color: #334155; font-size: 14px; margin-bottom: 4px;">📊 言及の多さの比較</div>
+            <div style="font-size: 14px; color: #333; line-height: 1.5;">{vol_comp}</div>
+        </div>
+        <div style="border-left: 4px solid #475569; background-color: #f8f9fa; padding: 15px; margin-bottom: 10px; border-radius: 0 4px 4px 0;">
+            <div style="font-weight: bold; color: #334155; font-size: 14px; margin-bottom: 4px;">🔢 言及順番の比較（第一想起されているか）</div>
+            <div style="font-size: 14px; color: #333; line-height: 1.5;">{order_comp}</div>
+        </div>
+        <div style="border-left: 4px solid #475569; background-color: #f8f9fa; padding: 15px; border-radius: 0 4px 4px 0;">
+            <div style="font-weight: bold; color: #334155; font-size: 14px; margin-bottom: 4px;">💬 言及内容の比較（どのように語られているか）</div>
+            <div style="font-size: 14px; color: #333; line-height: 1.5;">{content_comp}</div>
+        </div>
+    </div>
+    
+    <div style="background-color: #e8f0fe; border: 1px solid #c2d7fa; padding: 15px; border-radius: 8px;">
         <div style="font-weight: bold; color: #1a73e8; margin-bottom: 8px;">💡 対競合の戦略的アドバイス</div>
-        <div style="font-size: 14px; color: #333;">{comp_data.get('strategic_advice', 'データなし')}</div>
+        <div style="font-size: 15px; color: #333; line-height: 1.6;">{comp_data.get('strategic_advice', 'データなし')}</div>
     </div>
     """)
     
