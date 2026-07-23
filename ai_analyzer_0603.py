@@ -185,7 +185,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング（★詳細分析のスキーマを追加）
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★詳細分析の指示を具体的に強化）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -268,11 +268,15 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "negative_gap": What misconceptions or weak points exist in the AI's understanding?
             2. "topline": Write a single-sentence summary strategy for executives.
             3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
-            4. "detailed_discrepancies": Identify up to 10 specific, detailed discrepancies (gaps) between the owned media intent and the AI's understanding that have a HIGH business impact. For each, provide the "issue" (the specific gap in Japanese), the "impact" (why it negatively or positively impacts the business), and the "solution" (actionable advice to fix or leverage it). This section must demonstrate a deep, meticulous analysis of the data.
+            4. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC discrepancies (gaps) between the owned media intent and the AI's understanding. 
+               CRITICAL INSTRUCTION: You MUST avoid generic business advice. Every item MUST explicitly quote a specific keyword from [OWNED MEDIA KEYWORDS] and contrast it directly with specific data points, quotes, or ranks from [GENERATIVE AI RANKING DATA] or [GENERATIVE AI BRAND EVALUATION].
+               - "issue": Detail the gap by citing specific terms (e.g., "自社は『〇〇』というキーワードを重視しているが、AIの回答データでは『△△』と出力されており、関連づけられていない").
+               - "impact": Explain the specific business impact tailored to THIS brand's actual product and market.
+               - "solution": Provide a concrete, highly specific PR/Marketing action to fix this exact gap. Do NOT say "SNSで発信する" or "コンテンツを増やす". Suggest specific messaging changes, SEO adjustments for AI, or specific content angles based on the data.
             5. "radar_quantity", "radar_quality" & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
-               - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media (e.g., Out of 100 answers, how many align with the brand intent?).
+               - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
                - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
-               CRITICAL for "radar_reasons": Provide a DETAILED business reason (approx. 150-200 characters in Japanese) explaining BOTH the quantity and quality scores based on the data.
+               CRITICAL for "radar_reasons": Provide a DETAILED business reason explaining BOTH the quantity and quality scores based on the data.
                Criteria:
                - "brand_philosophy": ブランド理念
                - "functional_value": 機能価値
@@ -463,7 +467,7 @@ if st.session_state.bas_result:
     st.divider()
 
     # ==========================================
-    # ④ 重要な乖離の詳細と解決策 (★新規追加)
+    # ④ 重要な乖離の詳細と解決策
     # ==========================================
     st.markdown("### 🔍 ④ 重要な乖離の詳細と解決策")
     st.caption("細かなデータ分析に基づき、ビジネスへの影響が大きい乖離ポイントを深掘りし、具体的な解決策の糸口を提示します。")
@@ -485,7 +489,7 @@ if st.session_state.bas_result:
                     {impact}
                 </div>
                 <div style="font-size: 14px; color: #334155; padding-top: 12px; padding-left: 26px; border-top: 1px dashed #cbd5e1;">
-                    <span style="font-weight: bold; color: #0284c7; display: block; margin-bottom: 4px;">💡 解決へのアドバイス:</span>
+                    <span style="font-weight: bold; color: #0284c7; display: block; margin-bottom: 4px;">💡 解決への具体的なアドバイス:</span>
                     {solution}
                 </div>
             </div>
