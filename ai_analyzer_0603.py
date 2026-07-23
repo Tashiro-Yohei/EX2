@@ -202,7 +202,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★項目を更新し、競合分析を追加）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -216,6 +216,17 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         "required": ["match", "positive_gap", "negative_gap"]
                     },
                     "topline": {"type": "string"},
+                    "competitive_analysis": {
+                        "type": "object",
+                        "properties": {
+                            "score": {"type": "integer"},
+                            "current_status": {"type": "string"},
+                            "advantage": {"type": "string"},
+                            "disadvantage": {"type": "string"},
+                            "strategic_advice": {"type": "string"}
+                        },
+                        "required": ["score", "current_status", "advantage", "disadvantage", "strategic_advice"]
+                    },
                     "improvement_actions": {"type": "array", "items": {"type": "string"}},
                     "detailed_discrepancies": {
                         "type": "array",
@@ -236,9 +247,9 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                             "functional_value": {"type": "integer"},
                             "emotional_engagement": {"type": "integer"},
                             "safety_reputation": {"type": "integer"},
-                            "competitive_priority": {"type": "integer"}
+                            "usage_scene_moment": {"type": "integer"}
                         },
-                        "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
+                        "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "usage_scene_moment"]
                     },
                     "radar_quantity_summary": {"type": "string"},
                     "radar_quality": {
@@ -248,9 +259,9 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                             "functional_value": {"type": "integer"},
                             "emotional_engagement": {"type": "integer"},
                             "safety_reputation": {"type": "integer"},
-                            "competitive_priority": {"type": "integer"}
+                            "usage_scene_moment": {"type": "integer"}
                         },
-                        "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
+                        "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "usage_scene_moment"]
                     },
                     "radar_quality_summary": {"type": "string"},
                     "radar_reasons": {
@@ -260,12 +271,12 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                             "functional_value": {"type": "string"},
                             "emotional_engagement": {"type": "string"},
                             "safety_reputation": {"type": "string"},
-                            "competitive_priority": {"type": "string"}
+                            "usage_scene_moment": {"type": "string"}
                         },
-                        "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
+                        "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "usage_scene_moment"]
                     }
                 },
-                "required": ["diagnosis_story", "topline", "improvement_actions", "detailed_discrepancies", "radar_quantity", "radar_quantity_summary", "radar_quality", "radar_quality_summary", "radar_reasons"]
+                "required": ["diagnosis_story", "topline", "competitive_analysis", "improvement_actions", "detailed_discrepancies", "radar_quantity", "radar_quantity_summary", "radar_quality", "radar_quality_summary", "radar_reasons"]
             }
 
             prompt_analysis = f"""
@@ -286,13 +297,19 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "positive_gap": What unexpected strengths or positive perceptions did the AI find?
                - "negative_gap": What misconceptions or weak points exist in the AI's understanding?
             2. "topline": Write a single-sentence summary strategy for executives.
-            3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
-            4. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements in the Generative AI's understanding. 
+            3. "competitive_analysis": Analyze how the AI perceives the brand relative to its competitors based ONLY on the provided data.
+               - "score": Estimate a competitive priority score (0-100) indicating how often the AI recommends this brand over others.
+               - "current_status": Describe the brand's current competitive standing in the AI's responses (approx 100 characters).
+               - "advantage": What specific advantage does the AI highlight over competitors?
+               - "disadvantage": What specific weakness does the AI highlight compared to competitors?
+               - "strategic_advice": Provide one highly specific strategic action to improve the brand's AI ranking/recommendation rate against competitors.
+            4. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
+            5. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements in the Generative AI's understanding. 
                CRITICAL INSTRUCTION: Do NOT explicitly assert or guess the company's intended message (e.g., absolutely DO NOT write "自社は『〇〇』と発信しているが..."). If you misinterpret the company's intent, it will ruin the credibility of the report. Instead, focus entirely on what the AI currently outputs. Every item MUST explicitly quote specific data points, quotes, or ranks from [GENERATIVE AI RANKING DATA] or [GENERATIVE AI BRAND EVALUATION].
                - "issue": Detail the specific AI perception issue based ONLY on the provided AI data.
                - "impact": Explain the specific business impact tailored to THIS brand's actual product and market.
                - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap. Do NOT say "SNSで発信する" or "コンテンツを増やす".
-            5. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
+            6. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
                - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
                - "radar_quantity_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the quantitative radar chart.
                - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
@@ -303,7 +320,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "functional_value": 機能価値
                - "emotional_engagement": 情緒的エンゲージメント
                - "safety_reputation": 安全性と評判
-               - "competitive_priority": 対競合優先度
+               - "usage_scene_moment": 利用シーン・モーメント一致度 (Match in usage context/timing)
             Return JSON in Japanese.
             """
 
@@ -387,10 +404,11 @@ if st.session_state.bas_result:
     qual_summary = res.get("radar_quality_summary", "サマリーデータがありません。")
     reasons = res.get("radar_reasons", {})
     
-    categories = ['ブランド理念', '機能価値', '情緒的<br>エンゲージメント', '安全性と評判', '対競合優先度']
+    # ★ 競合優先度を削除し、利用シーン・モーメントに変更
+    categories = ['ブランド理念', '機能価値', '情緒的<br>エンゲージメント', '安全性と評判', '利用シーン・<br>モーメント']
     categories_closed = categories + [categories[0]]
     
-    keys = ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
+    keys = ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "usage_scene_moment"]
     qty_scores = [q_qty.get(k, 0) for k in keys]
     qual_scores = [q_qual.get(k, 0) for k in keys]
     
@@ -474,7 +492,7 @@ if st.session_state.bas_result:
     # 評価理由をカード型デザインで表示
     st.markdown("#### 📝 各項目の評価詳細（なぜこの数値になったのか）")
     
-    for title, key in zip(['ブランド理念の浸透度', '機能価値の伝達度', '情緒的エンゲージメント', 'ブランドの安全性と評判', '対競合優先度'], keys):
+    for title, key in zip(['ブランド理念の浸透度', '機能価値の伝達度', '情緒的エンゲージメント', 'ブランドの安全性と評判', '利用シーン・モーメント一致度'], keys):
         qty_val = q_qty.get(key, 0)
         qual_val = q_qual.get(key, 0)
         reason = reasons.get(key, 'データなし')
@@ -499,11 +517,57 @@ if st.session_state.bas_result:
         """)
 
     st.divider()
+    
+    # ==========================================
+    # ③ 対競合優先度の分析（★新設）
+    # ==========================================
+    st.markdown("### ⚔️ ③ 対競合優先度の分析")
+    st.caption("AIの回答データ内において、自社が競合他社と比較してどれだけ優先的に推奨・言及されているかを分析します。")
+    
+    comp_data = res.get("competitive_analysis", {})
+    comp_score = comp_data.get("score", 0)
+    
+    # スコアに応じたカラー設定
+    if comp_score >= 75:
+        c_bg, c_border, c_text = "#d4edda", "#c3e6cb", "#155724"
+    elif comp_score >= 60:
+        c_bg, c_border, c_text = "#fff3cd", "#ffeeba", "#856404"
+    else:
+        c_bg, c_border, c_text = "#f8d7da", "#f5c6cb", "#721c24"
+        
+    st.html(f"""
+    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+        <div style="flex: 0 0 200px; background-color: {c_bg}; border: 1px solid {c_border}; border-radius: 8px; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 14px; color: {c_text}; font-weight: bold; margin-bottom: 5px;">対競合 推奨スコア</div>
+            <div style="font-size: 42px; font-weight: bold; color: {c_text};">{comp_score}</div>
+        </div>
+        <div style="flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; background-color: #ffffff;">
+            <div style="font-size: 14px; color: #64748b; font-weight: bold; margin-bottom: 5px;">現在のポジション</div>
+            <div style="font-size: 16px; color: #334155; line-height: 1.5;">{comp_data.get('current_status', 'データなし')}</div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+        <div style="flex: 1; border-top: 4px solid #28a745; background-color: #f8f9fa; padding: 15px; border-radius: 4px;">
+            <div style="font-weight: bold; color: #28a745; margin-bottom: 8px;">✨ 競合に対する強み (Advantage)</div>
+            <div style="font-size: 14px; color: #333;">{comp_data.get('advantage', 'データなし')}</div>
+        </div>
+        <div style="flex: 1; border-top: 4px solid #dc3545; background-color: #f8f9fa; padding: 15px; border-radius: 4px;">
+            <div style="font-weight: bold; color: #dc3545; margin-bottom: 8px;">⚠️ 競合に対する弱み (Disadvantage)</div>
+            <div style="font-size: 14px; color: #333;">{comp_data.get('disadvantage', 'データなし')}</div>
+        </div>
+    </div>
+    <div style="background-color: #e8f0fe; border-left: 5px solid #1a73e8; padding: 15px; border-radius: 4px;">
+        <div style="font-weight: bold; color: #1a73e8; margin-bottom: 8px;">💡 対競合の戦略的アドバイス</div>
+        <div style="font-size: 14px; color: #333;">{comp_data.get('strategic_advice', 'データなし')}</div>
+    </div>
+    """)
+    
+    st.divider()
 
     # ==========================================
-    # ③ 今後、マーケティングで打つべき具体策
+    # ④ 今後、マーケティングで打つべき具体策
     # ==========================================
-    st.markdown("### 🚀 ③ 今後、マーケティングで打つべき具体策")
+    st.markdown("### 🚀 ④ 今後、マーケティングで打つべき具体策")
     st.caption("AIの誤解を解き、意外な強みを自社のPRに活かすための5つのアクションプランです。")
     
     st.info(f"**【戦略方針】** {res.get('topline')}")
@@ -524,9 +588,9 @@ if st.session_state.bas_result:
     st.divider()
 
     # ==========================================
-    # ④ 重要な乖離の詳細と解決策
+    # ⑤ 重要な乖離の詳細と解決策
     # ==========================================
-    st.markdown("### 🔍 ④ 重要な乖離の詳細と解決策")
+    st.markdown("### 🔍 ⑤ 重要な乖離の詳細と解決策")
     st.caption("細かなデータ分析に基づき、ビジネスへの影響が大きい乖離ポイントを深掘りし、具体的な解決策の糸口を提示します。")
     
     discrepancies = res.get("detailed_discrepancies", [])
