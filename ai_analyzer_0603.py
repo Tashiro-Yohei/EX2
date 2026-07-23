@@ -36,11 +36,28 @@ st.html("""
             header[data-testid="stHeader"] { display: none !important; }
             .no-print { display: none !important; }
             iframe { display: none !important; }
-            .block-container { padding-top: 0rem !important; max-width: 100% !important; }
+            .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; max-width: 100% !important; }
             * {
                 -webkit-print-color-adjust: exact !important;
                 color-adjust: exact !important;
                 print-color-adjust: exact !important;
+            }
+            
+            /* A4印刷時の横並び維持と、はみ出し防止 */
+            [data-testid="stHorizontalBlock"] {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                align-items: center !important;
+            }
+            [data-testid="column"] {
+                min-width: 0 !important;
+            }
+            
+            /* Plotly（画像化されたグラフ）を枠内に強制収容 */
+            .js-plotly-plot, .plotly, .plotly svg {
+                max-width: 100% !important;
+                height: auto !important;
             }
         }
     </style>
@@ -185,7 +202,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング（★サマリー用の項目を2つ追加）
+            # Phase 2: 戦略的ギャップ分析とスコアリング
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -272,14 +289,14 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
             3. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
             4. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements in the Generative AI's understanding. 
                CRITICAL INSTRUCTION: Do NOT explicitly assert or guess the company's intended message (e.g., absolutely DO NOT write "自社は『〇〇』と発信しているが..."). If you misinterpret the company's intent, it will ruin the credibility of the report. Instead, focus entirely on what the AI currently outputs. Every item MUST explicitly quote specific data points, quotes, or ranks from [GENERATIVE AI RANKING DATA] or [GENERATIVE AI BRAND EVALUATION].
-               - "issue": Detail the specific AI perception issue based ONLY on the provided AI data (e.g., "AIの回答データにおいて、『△△』という評価が目立っており、〇〇の側面への言及が欠落している").
+               - "issue": Detail the specific AI perception issue based ONLY on the provided AI data.
                - "impact": Explain the specific business impact tailored to THIS brand's actual product and market.
-               - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap. Do NOT say "SNSで発信する" or "コンテンツを増やす". Suggest specific messaging changes, SEO adjustments for AI, or specific content angles based on the data.
+               - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap. Do NOT say "SNSで発信する" or "コンテンツを増やす".
             5. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
                - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
-               - "radar_quantity_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the quantitative radar chart. Is the overall alignment high or low? Which specific criteria stand out as good or bad?
+               - "radar_quantity_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the quantitative radar chart.
                - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
-               - "radar_quality_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the qualitative radar chart. Is the overall similarity high or low? Which specific criteria stand out as good or bad?
+               - "radar_quality_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the qualitative radar chart.
                CRITICAL for "radar_reasons": Provide a DETAILED business reason explaining BOTH the quantity and quality scores based on the data.
                Criteria:
                - "brand_philosophy": ブランド理念
@@ -380,8 +397,8 @@ if st.session_state.bas_result:
     qty_closed = qty_scores + [qty_scores[0]]
     qual_closed = qual_scores + [qual_scores[0]]
 
-    # --- 1段目：① 量的乖離 ---
-    st.markdown("#### 🔵 ① 量的乖離（自社発信と一致する確率：％）")
+    # --- 1段目：1. 量的乖離 ---
+    st.markdown("#### 🔵 1. 量的乖離（自社発信と一致する確率：％）")
     col_chart1, col_summary1 = st.columns([1, 1.2])
     
     with col_chart1:
@@ -397,14 +414,15 @@ if st.session_state.bas_result:
         fig_qty.update_layout(
             polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
             showlegend=False,
-            margin=dict(l=50, r=50, t=30, b=30),
-            height=380
+            margin=dict(l=40, r=40, t=30, b=30),
+            height=320 # A4横幅に確実に収めるため少しコンパクトに
         )
-        st.plotly_chart(fig_qty, use_container_width=True)
+        # config={'staticPlot': True} で画像化（はみ出し防止）
+        st.plotly_chart(fig_qty, use_container_width=True, config={'staticPlot': True})
         
     with col_summary1:
         st.html(f"""
-        <div style="margin-top: 40px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #1a73e8; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="margin-top: 20px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #1a73e8; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <div style="font-weight: bold; color: #1a73e8; margin-bottom: 12px; font-size: 16px;">
                 📈 量的乖離の全体傾向
             </div>
@@ -414,10 +432,10 @@ if st.session_state.bas_result:
         </div>
         """)
 
-    st.markdown("<br>", unsafe_allow_html=True) # 少し余白
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- 2段目：② 質的乖離 ---
-    st.markdown("#### 🟢 ② 質的乖離（自社発信と内容の類似度：％）")
+    # --- 2段目：2. 質的乖離 ---
+    st.markdown("#### 🟢 2. 質的乖離（自社発信と内容の類似度：％）")
     col_chart2, col_summary2 = st.columns([1, 1.2])
     
     with col_chart2:
@@ -433,14 +451,15 @@ if st.session_state.bas_result:
         fig_qual.update_layout(
             polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
             showlegend=False,
-            margin=dict(l=50, r=50, t=30, b=30),
-            height=380
+            margin=dict(l=40, r=40, t=30, b=30),
+            height=320 # A4横幅に確実に収めるため少しコンパクトに
         )
-        st.plotly_chart(fig_qual, use_container_width=True)
+        # config={'staticPlot': True} で画像化（はみ出し防止）
+        st.plotly_chart(fig_qual, use_container_width=True, config={'staticPlot': True})
         
     with col_summary2:
         st.html(f"""
-        <div style="margin-top: 40px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #28a745; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="margin-top: 20px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #28a745; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <div style="font-weight: bold; color: #28a745; margin-bottom: 12px; font-size: 16px;">
                 📈 質的乖離の全体傾向
             </div>
