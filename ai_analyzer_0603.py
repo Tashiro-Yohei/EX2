@@ -185,7 +185,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング（★詳細分析の指示から「自社は〜」の推測を排除）
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★サマリー用の項目を2つ追加）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -223,6 +223,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         },
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
                     },
+                    "radar_quantity_summary": {"type": "string"},
                     "radar_quality": {
                         "type": "object",
                         "properties": {
@@ -234,6 +235,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         },
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
                     },
+                    "radar_quality_summary": {"type": "string"},
                     "radar_reasons": {
                         "type": "object",
                         "properties": {
@@ -246,7 +248,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "competitive_priority"]
                     }
                 },
-                "required": ["diagnosis_story", "topline", "improvement_actions", "detailed_discrepancies", "radar_quantity", "radar_quality", "radar_reasons"]
+                "required": ["diagnosis_story", "topline", "improvement_actions", "detailed_discrepancies", "radar_quantity", "radar_quantity_summary", "radar_quality", "radar_quality_summary", "radar_reasons"]
             }
 
             prompt_analysis = f"""
@@ -273,9 +275,11 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "issue": Detail the specific AI perception issue based ONLY on the provided AI data (e.g., "AIの回答データにおいて、『△△』という評価が目立っており、〇〇の側面への言及が欠落している").
                - "impact": Explain the specific business impact tailored to THIS brand's actual product and market.
                - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap. Do NOT say "SNSで発信する" or "コンテンツを増やす". Suggest specific messaging changes, SEO adjustments for AI, or specific content angles based on the data.
-            5. "radar_quantity", "radar_quality" & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
+            5. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
                - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
+               - "radar_quantity_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the quantitative radar chart. Is the overall alignment high or low? Which specific criteria stand out as good or bad?
                - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
+               - "radar_quality_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the qualitative radar chart. Is the overall similarity high or low? Which specific criteria stand out as good or bad?
                CRITICAL for "radar_reasons": Provide a DETAILED business reason explaining BOTH the quantity and quality scores based on the data.
                Criteria:
                - "brand_philosophy": ブランド理念
@@ -362,6 +366,8 @@ if st.session_state.bas_result:
     
     q_qty = res.get("radar_quantity", {})
     q_qual = res.get("radar_quality", {})
+    qty_summary = res.get("radar_quantity_summary", "サマリーデータがありません。")
+    qual_summary = res.get("radar_quality_summary", "サマリーデータがありません。")
     reasons = res.get("radar_reasons", {})
     
     categories = ['ブランド理念', '機能価値', '情緒的<br>エンゲージメント', '安全性と評判', '対競合優先度']
@@ -374,10 +380,11 @@ if st.session_state.bas_result:
     qty_closed = qty_scores + [qty_scores[0]]
     qual_closed = qual_scores + [qual_scores[0]]
 
-    col_qty, col_qual = st.columns(2)
+    # --- 1段目：① 量的乖離 ---
+    st.markdown("#### 🔵 ① 量的乖離（自社発信と一致する確率：％）")
+    col_chart1, col_summary1 = st.columns([1, 1.2])
     
-    with col_qty:
-        st.markdown("<div style='text-align:center; font-weight:bold; color:#1a73e8;'>① 量的乖離（自社発信と一致する確率：％）</div>", unsafe_allow_html=True)
+    with col_chart1:
         fig_qty = go.Figure()
         fig_qty.add_trace(go.Scatterpolar(
             r=qty_closed,
@@ -394,9 +401,26 @@ if st.session_state.bas_result:
             height=380
         )
         st.plotly_chart(fig_qty, use_container_width=True)
+        
+    with col_summary1:
+        st.html(f"""
+        <div style="margin-top: 40px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #1a73e8; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="font-weight: bold; color: #1a73e8; margin-bottom: 12px; font-size: 16px;">
+                📈 量的乖離の全体傾向
+            </div>
+            <div style="font-size: 15px; color: #333; line-height: 1.8;">
+                {qty_summary}
+            </div>
+        </div>
+        """)
 
-    with col_qual:
-        st.markdown("<div style='text-align:center; font-weight:bold; color:#137333;'>② 質的乖離（自社発信と内容の類似度：％）</div>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True) # 少し余白
+
+    # --- 2段目：② 質的乖離 ---
+    st.markdown("#### 🟢 ② 質的乖離（自社発信と内容の類似度：％）")
+    col_chart2, col_summary2 = st.columns([1, 1.2])
+    
+    with col_chart2:
         fig_qual = go.Figure()
         fig_qual.add_trace(go.Scatterpolar(
             r=qual_closed,
@@ -413,6 +437,20 @@ if st.session_state.bas_result:
             height=380
         )
         st.plotly_chart(fig_qual, use_container_width=True)
+        
+    with col_summary2:
+        st.html(f"""
+        <div style="margin-top: 40px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #28a745; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="font-weight: bold; color: #28a745; margin-bottom: 12px; font-size: 16px;">
+                📈 質的乖離の全体傾向
+            </div>
+            <div style="font-size: 15px; color: #333; line-height: 1.8;">
+                {qual_summary}
+            </div>
+        </div>
+        """)
+
+    st.divider()
 
     # 評価理由をカード型デザインで表示
     st.markdown("#### 📝 各項目の評価詳細（なぜこの数値になったのか）")
