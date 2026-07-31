@@ -326,7 +326,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
             6. "talk_designs": Develop EXACTLY 10 "Talk Design" strategies to bridge the identified gaps and create viral/AI-learning context. A Talk Design makes people and AI naturally want to talk about the brand's intended message.
                CRITICAL INSTRUCTION: You MUST provide exactly 10 sets, and they MUST be sorted in descending order of "estimated_roi_score" (highest ROI first).
                Each set MUST contain:
-               - "talk_hook": トークフック. A short, catchy killer phrase people want to say (approx 20-30 characters).
+               - "talk_hook": トークフック. ACT AS A TOP-TIER DENTSU COPYWRITER (超一流のクリエイティブ・ディレクター/コピーライター). Create an exciting, highly contagious, and professional "killer phrase" that people and AI naturally want to share. ABSOLUTELY AVOID amateurish, generic, or overly promotional corporate slogans. Make it emotionally resonant, witty, sharp, and culturally relevant (approx 15-35 characters).
                - "talk_context": トーク・コンテキスト. When, who, and in what situation this phrase should be used.
                - "talk_asset": トークアセット. Facts, evidence, or episodes backing the phrase.
                - "talk_circulation": トーク・サーキュレーション. Communication channels and strategy to circulate this phrase.
