@@ -202,7 +202,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング（★トークデザインのプロンプトを大幅強化）
+            # Phase 2: 戦略的ギャップ分析とスコアリング
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -250,9 +250,11 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                                 "talk_asset": {"type": "string"},
                                 "talk_circulation": {"type": "string"},
                                 "estimated_roi_score": {"type": "integer"},
-                                "roi_reasoning": {"type": "string"}
+                                "roi_reasoning": {"type": "string"},
+                                "impact_score": {"type": "integer"},
+                                "feasibility_score": {"type": "integer"}
                             },
-                            "required": ["talk_hook", "talk_context", "talk_asset", "talk_circulation", "estimated_roi_score", "roi_reasoning"]
+                            "required": ["talk_hook", "talk_context", "talk_asset", "talk_circulation", "estimated_roi_score", "roi_reasoning", "impact_score", "feasibility_score"]
                         }
                     },
                     "radar_quantity": {
@@ -317,12 +319,15 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                CRITICAL STRATEGIC GOAL: Do NOT simply pander to the AI's current perception. The ultimate goal is to design context that forces both humans and AI to move CLOSER to the company's TRUE INTENDED MESSAGE (as defined in [OWNED MEDIA KEYWORDS]). Exclude any ideas that are disconnected from the company's intended message, but creatively expand ideas as long as they logically connect back to what the brand wants to communicate.
                QUALITY CONTROL PROCESS: Act as a team of elite Dentsu copywriters and strategic marketers. Do NOT output your first draft. Internally, you MUST review, critique, and polish these 10 ideas at least 3 TIMES before generating the JSON. Ensure the ideas are not amateurish, generic, or overly corporate.
                CRITICAL INSTRUCTION: Provide exactly 10 sets, sorted in descending order of "estimated_roi_score".
+               Each set MUST contain:
                - "talk_hook": トーク・フック. (Refined 3 times by a top Dentsu copywriter). An exciting, highly contagious "killer phrase". Make it emotionally resonant, witty, sharp, and culturally relevant. Avoid boring corporate slogans.
                - "talk_context": トーク・コンテキスト. When, who, and in what situation this phrase should be used.
                - "talk_asset": トークアセット. Facts, evidence, or episodes backing the phrase to effectively train both humans and AI.
                - "talk_circulation": トーク・サーキュレーション. Communication channels and strategy to circulate this phrase.
                - "estimated_roi_score": 推定ROIスコア (%). An integer score estimating Return on Investment. MUST be strictly GREATER THAN 100 (e.g., 120, 150, 300, etc.), as anything under 100 is a loss. Calculate this by inferring how much this design changes perception TOWARD THE INTENDED MESSAGE and how that converts to purchases.
                - "roi_reasoning": ROI算出根拠. A brief explanation of why this specific score was given.
+               - "impact_score": 効果 (0-100). How much impact this talk design has on changing consumer perception and driving purchases.
+               - "feasibility_score": 実効性 (0-100). How realistic, cost-effective, and actionable the circulation strategy is.
             7. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the 5 criteria. Average them for the summary.
             Return JSON in Japanese.
             """
@@ -592,15 +597,17 @@ if st.session_state.bas_result:
             circulation = td.get("talk_circulation", "")
             roi_score = td.get("estimated_roi_score", 0)
             roi_reasoning = td.get("roi_reasoning", "")
+            impact_score = td.get("impact_score", 0)
+            feasibility_score = td.get("feasibility_score", 0)
             
             # ランキング上位はメダルアイコンに変更
-            rank_icon = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+            rank_icon = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else ""
             
             st.html(f"""
             <div style="border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 25px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                 <div style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 15px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
                     <div style="font-weight: bold; font-size: 18px; color: #1e293b;">
-                        {rank_icon} トーク・フック: <span style="color: #0ea5e9;">「{hook}」</span>
+                        {rank_icon} 優先度{i} トーク・フック: <span style="color: #0ea5e9;">「{hook}」</span>
                     </div>
                     <div style="background-color: #0ea5e9; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px;">
                         推定ROI: {roi_score}%
@@ -624,13 +631,36 @@ if st.session_state.bas_result:
                         <div style="font-size: 15px; color: #334155; line-height: 1.5;">{circulation}</div>
                     </div>
                     
-                    <div style="border-top: 1px dashed #cbd5e1; padding-top: 15px;">
-                        <div style="font-weight: bold; color: #64748b; font-size: 13px; margin-bottom: 5px;">📈 ROIの算出根拠 (認識変容 → 購買予測)</div>
-                        <div style="font-size: 14px; color: #475569; line-height: 1.5;">{roi_reasoning}</div>
+                    <div style="border-top: 1px dashed #cbd5e1; padding-top: 15px; display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1; padding-right: 20px;">
+                            <div style="font-weight: bold; color: #64748b; font-size: 13px; margin-bottom: 5px;">📈 ROIの算出根拠 (認識変容 → 購買予測)</div>
+                            <div style="font-size: 14px; color: #475569; line-height: 1.5;">{roi_reasoning}</div>
+                        </div>
+                        <div style="display: flex; gap: 15px; flex-shrink: 0; padding-top: 5px;">
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; text-align: center;">
+                                <div style="font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 2px;">効果</div>
+                                <div style="font-size: 16px; color: #0f172a; font-weight: bold;">{impact_score}</div>
+                            </div>
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; text-align: center;">
+                                <div style="font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 2px;">実効性</div>
+                                <div style="font-size: 16px; color: #0f172a; font-weight: bold;">{feasibility_score}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             """)
+
+        # スコア算出ロジックの共通メモ書き
+        st.html("""
+        <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 13px; color: #475569;">
+            <strong>📝 効果・実効性の算出ロジックについて</strong><br>
+            <ul style="margin-top: 5px; margin-bottom: 0; padding-left: 20px; line-height: 1.6;">
+                <li><strong>効果（0〜100）：</strong> そのトークデザインが生活者やAIの認識をどれだけ強力に「自社の意図するメッセージ」へ変容させ、実際の購買行動（転換）に結びつけるインパクトがあるかを評価したスコアです。</li>
+                <li><strong>実効性（0〜100）：</strong> 指定されたトーク・サーキュレーション（流通施策）を実際に企業が実行する際の「現実味（予算、工数、実現難易度）」と、想定通りにターゲットへ波及・拡散する確度を評価したスコアです。</li>
+            </ul>
+        </div>
+        """)
     else:
         st.write("トークデザインのデータが生成されませんでした。")
 
