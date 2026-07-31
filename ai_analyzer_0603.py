@@ -202,7 +202,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★トークデザインのプロンプトを大幅強化）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -307,42 +307,23 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
             
             TASK:
             1. "diagnosis_story": Write 3 fluent narrative paragraphs in Japanese (EACH strictly around 200-250 characters) aimed at business executives.
-               - "match": What aspects of the company's message are correctly understood by the AI?
-               - "positive_gap": What unexpected strengths or positive perceptions did the AI find?
-               - "negative_gap": What misconceptions or weak points exist in the AI's understanding?
             2. "topline": Write a single-sentence summary strategy for executives.
             3. "competitive_analysis": Analyze how the AI perceives the brand relative to its competitors based ONLY on the provided data. DO NOT USE NUMERICAL SCORES AND DO NOT LIST SIMPLE WIN/LOSS.
-               - "benchmark_competitors": ベンチマークとすべき企業 (Qualitatively suggest 1-2 competitor brands that this brand should benchmark against in AI recommendations based on mention frequency, order, and context. Explain WHY qualitatively. Around 80-120 characters).
-               - "mention_volume_comparison": 言及の多さの比較 (Compare the frequency/volume of mentions of this brand versus competitors in the data. Around 80-100 characters).
-               - "mention_order_comparison": 言及順番の比較 (Compare the ranking or order in which this brand is mentioned versus competitors. Are competitors mentioned first? Around 80-100 characters).
-               - "mention_content_comparison": 言及内容の比較 (Compare the qualitative content/context of mentions. How does the AI describe this brand compared to competitors? Around 80-100 characters).
-               - "strategic_advice": Provide one highly specific strategic action to improve the brand's position against the benchmarked competitors.
+               - "benchmark_competitors": ベンチマークとすべき企業 (Qualitatively suggest 1-2 competitor brands. Explain WHY. Around 80-120 characters).
+               - "mention_volume_comparison", "mention_order_comparison", "mention_content_comparison", "strategic_advice".
             4. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
-            5. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements in the Generative AI's understanding. 
-               CRITICAL INSTRUCTION: Do NOT explicitly assert or guess the company's intended message. Focus entirely on what the AI currently outputs. Every item MUST explicitly quote specific data points, quotes, or ranks from [GENERATIVE AI RANKING DATA] or [GENERATIVE AI BRAND EVALUATION].
-               - "issue": Detail the specific AI perception issue based ONLY on the provided AI data.
-               - "impact": Explain the specific business impact tailored to THIS brand's actual product and market.
-               - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap.
-            6. "talk_designs": Develop EXACTLY 10 "Talk Design" strategies to bridge the identified gaps and create viral/AI-learning context. A Talk Design makes people and AI naturally want to talk about the brand's intended message.
-               CRITICAL INSTRUCTION: You MUST provide exactly 10 sets, and they MUST be sorted in descending order of "estimated_roi_score" (highest ROI first).
-               Each set MUST contain:
-               - "talk_hook": トークフック. ACT AS A TOP-TIER DENTSU COPYWRITER (超一流のクリエイティブ・ディレクター/コピーライター). Create an exciting, highly contagious, and professional "killer phrase" that people and AI naturally want to share. ABSOLUTELY AVOID amateurish, generic, or overly promotional corporate slogans. Make it emotionally resonant, witty, sharp, and culturally relevant (approx 15-35 characters).
+            5. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements. Focus entirely on what the AI currently outputs versus the intended keywords.
+            6. "talk_designs": Develop EXACTLY 10 "Talk Design Marketing" strategies.
+               CRITICAL STRATEGIC GOAL: Do NOT simply pander to the AI's current perception. The ultimate goal is to design context that forces both humans and AI to move CLOSER to the company's TRUE INTENDED MESSAGE (as defined in [OWNED MEDIA KEYWORDS]). Exclude any ideas that are disconnected from the company's intended message, but creatively expand ideas as long as they logically connect back to what the brand wants to communicate.
+               QUALITY CONTROL PROCESS: Act as a team of elite Dentsu copywriters and strategic marketers. Do NOT output your first draft. Internally, you MUST review, critique, and polish these 10 ideas at least 3 TIMES before generating the JSON. Ensure the ideas are not amateurish, generic, or overly corporate.
+               CRITICAL INSTRUCTION: Provide exactly 10 sets, sorted in descending order of "estimated_roi_score".
+               - "talk_hook": トーク・フック. (Refined 3 times by a top Dentsu copywriter). An exciting, highly contagious "killer phrase". Make it emotionally resonant, witty, sharp, and culturally relevant. Avoid boring corporate slogans.
                - "talk_context": トーク・コンテキスト. When, who, and in what situation this phrase should be used.
-               - "talk_asset": トークアセット. Facts, evidence, or episodes backing the phrase.
+               - "talk_asset": トークアセット. Facts, evidence, or episodes backing the phrase to effectively train both humans and AI.
                - "talk_circulation": トーク・サーキュレーション. Communication channels and strategy to circulate this phrase.
-               - "estimated_roi_score": 推定ROIスコア (%). An integer score estimating the Return on Investment. CRITICAL: Values MUST be strictly GREATER THAN 100 (e.g., 120, 150, 300, etc.), because an ROI under 100 means a financial loss. Calculate this by inferring how much this talk design changes consumer perception and how effectively that perception change converts to actual product purchases.
-               - "roi_reasoning": ROI算出根拠. A brief explanation of why this specific score was given based on perception change and purchase probability (approx 80-100 characters).
-            7. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
-               - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
-               - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
-               - "radar_summary": Write a single brief overview (approx. 100-150 characters in Japanese) summarizing the overall brand evaluation based on the AVERAGE of the quantity and quality scores.
-               CRITICAL for "radar_reasons": Provide a DETAILED business reason explaining BOTH the quantity and quality scores based on the data.
-               Criteria:
-               - "brand_philosophy": ブランド理念
-               - "functional_value": 機能価値
-               - "emotional_engagement": 情緒的エンゲージメント
-               - "safety_reputation": 安全性と評判
-               - "usage_scene_moment": 利用シーン・モーメント一致度 (Match in usage context/timing). CRITICAL INSTRUCTION: Do NOT score 0% simply because the owned media keywords omit specific usage scenes. If the AI's suggested usage broadly aligns with the common sense/expected usage of this product type (e.g., 'daily use' vs 'only when tired'), consider it a match and score it favorably.
+               - "estimated_roi_score": 推定ROIスコア (%). An integer score estimating Return on Investment. MUST be strictly GREATER THAN 100 (e.g., 120, 150, 300, etc.), as anything under 100 is a loss. Calculate this by inferring how much this design changes perception TOWARD THE INTENDED MESSAGE and how that converts to purchases.
+               - "roi_reasoning": ROI算出根拠. A brief explanation of why this specific score was given.
+            7. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the 5 criteria. Average them for the summary.
             Return JSON in Japanese.
             """
 
@@ -600,7 +581,7 @@ if st.session_state.bas_result:
     # ⑥ トークデザイン開発
     # ==========================================
     st.markdown("### 🗣️ ⑥ トークデザイン開発（語りたくなる文脈の設計）")
-    st.caption("人々やAIが自発的に「語りたくなる文脈」を意図的に仕掛けるトークデザイン・マーケティングの戦略案です。推定ROI（認識変容から購買への転換予測）が高い順に10セットを提示します。")
+    st.caption("人々やAIが自発的に「語りたくなる文脈」を意図的に仕掛けるトークデザイン・マーケティングの戦略案です。AIに迎合するのではなく、本来自社が伝えたいメッセージへと認識を引き寄せるための、推定ROI（認識変容から購買への転換予測）が高い10のフックを提示します。")
     
     talk_designs = res.get("talk_designs", [])
     if talk_designs:
