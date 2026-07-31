@@ -202,7 +202,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング（★トークデザイン要素のスキーマ追加）
+            # Phase 2: 戦略的ギャップ分析とスコアリング
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -330,7 +330,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "talk_context": トーク・コンテキスト. When, who, and in what situation this phrase should be used.
                - "talk_asset": トークアセット. Facts, evidence, or episodes backing the phrase.
                - "talk_circulation": トーク・サーキュレーション. Communication channels and strategy to circulate this phrase.
-               - "estimated_roi_score": 推定ROIスコア. An integer score (1-100) estimating the Return on Investment. Calculate this by inferring how much this talk design changes consumer perception and how effectively that perception change converts to actual product purchases.
+               - "estimated_roi_score": 推定ROIスコア (%). An integer score estimating the Return on Investment. CRITICAL: Values MUST be strictly GREATER THAN 100 (e.g., 120, 150, 300, etc.), because an ROI under 100 means a financial loss. Calculate this by inferring how much this talk design changes consumer perception and how effectively that perception change converts to actual product purchases.
                - "roi_reasoning": ROI算出根拠. A brief explanation of why this specific score was given based on perception change and purchase probability (approx 80-100 characters).
             7. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
                - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
@@ -597,7 +597,7 @@ if st.session_state.bas_result:
     st.divider()
 
     # ==========================================
-    # ⑥ トークデザイン開発（★新規追加）
+    # ⑥ トークデザイン開発
     # ==========================================
     st.markdown("### 🗣️ ⑥ トークデザイン開発（語りたくなる文脈の設計）")
     st.caption("人々やAIが自発的に「語りたくなる文脈」を意図的に仕掛けるトークデザイン・マーケティングの戦略案です。推定ROI（認識変容から購買への転換予測）が高い順に10セットを提示します。")
@@ -619,10 +619,10 @@ if st.session_state.bas_result:
             <div style="border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 25px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                 <div style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 15px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
                     <div style="font-weight: bold; font-size: 18px; color: #1e293b;">
-                        {rank_icon} 案: <span style="color: #0ea5e9;">「{hook}」</span>
+                        {rank_icon} トーク・フック: <span style="color: #0ea5e9;">「{hook}」</span>
                     </div>
                     <div style="background-color: #0ea5e9; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px;">
-                        推定ROI: {roi_score}
+                        推定ROI: {roi_score}%
                     </div>
                 </div>
                 
@@ -638,9 +638,9 @@ if st.session_state.bas_result:
                         </div>
                     </div>
                     
-                    <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
-                        <div style="font-weight: bold; color: #166534; font-size: 13px; margin-bottom: 5px; text-transform: uppercase;">🔄 トーク・サーキュレーション (流通施策)</div>
-                        <div style="font-size: 15px; color: #333; line-height: 1.5;">{circulation}</div>
+                    <div style="margin-bottom: 20px;">
+                        <div style="font-weight: bold; color: #475569; font-size: 13px; margin-bottom: 5px; text-transform: uppercase;">🔄 トーク・サーキュレーション (流通施策)</div>
+                        <div style="font-size: 15px; color: #334155; line-height: 1.5;">{circulation}</div>
                     </div>
                     
                     <div style="border-top: 1px dashed #cbd5e1; padding-top: 15px;">
