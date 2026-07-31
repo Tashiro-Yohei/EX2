@@ -202,7 +202,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                 st.error("AIサーバーが混雑しています。少し時間を置いて再度お試しください。")
                 st.stop()
 
-            # Phase 2: 戦略的ギャップ分析とスコアリング
+            # Phase 2: 戦略的ギャップ分析とスコアリング（★トークデザイン要素のスキーマ追加）
             response_schema = {
                 "type": "object",
                 "properties": {
@@ -240,6 +240,21 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                             "required": ["issue", "impact", "solution"]
                         }
                     },
+                    "talk_designs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "talk_hook": {"type": "string"},
+                                "talk_context": {"type": "string"},
+                                "talk_asset": {"type": "string"},
+                                "talk_circulation": {"type": "string"},
+                                "estimated_roi_score": {"type": "integer"},
+                                "roi_reasoning": {"type": "string"}
+                            },
+                            "required": ["talk_hook", "talk_context", "talk_asset", "talk_circulation", "estimated_roi_score", "roi_reasoning"]
+                        }
+                    },
                     "radar_quantity": {
                         "type": "object",
                         "properties": {
@@ -275,7 +290,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "usage_scene_moment"]
                     }
                 },
-                "required": ["diagnosis_story", "topline", "competitive_analysis", "improvement_actions", "detailed_discrepancies", "radar_quantity", "radar_quality", "radar_summary", "radar_reasons"]
+                "required": ["diagnosis_story", "topline", "competitive_analysis", "improvement_actions", "detailed_discrepancies", "talk_designs", "radar_quantity", "radar_quality", "radar_summary", "radar_reasons"]
             }
 
             prompt_analysis = f"""
@@ -308,7 +323,16 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "issue": Detail the specific AI perception issue based ONLY on the provided AI data.
                - "impact": Explain the specific business impact tailored to THIS brand's actual product and market.
                - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap.
-            6. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
+            6. "talk_designs": Develop EXACTLY 10 "Talk Design" strategies to bridge the identified gaps and create viral/AI-learning context. A Talk Design makes people and AI naturally want to talk about the brand's intended message.
+               CRITICAL INSTRUCTION: You MUST provide exactly 10 sets, and they MUST be sorted in descending order of "estimated_roi_score" (highest ROI first).
+               Each set MUST contain:
+               - "talk_hook": トークフック. A short, catchy killer phrase people want to say (approx 20-30 characters).
+               - "talk_context": トーク・コンテキスト. When, who, and in what situation this phrase should be used.
+               - "talk_asset": トークアセット. Facts, evidence, or episodes backing the phrase.
+               - "talk_circulation": トーク・サーキュレーション. Communication channels and strategy to circulate this phrase.
+               - "estimated_roi_score": 推定ROIスコア. An integer score (1-100) estimating the Return on Investment. Calculate this by inferring how much this talk design changes consumer perception and how effectively that perception change converts to actual product purchases.
+               - "roi_reasoning": ROI算出根拠. A brief explanation of why this specific score was given based on perception change and purchase probability (approx 80-100 characters).
+            7. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
                - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
                - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
                - "radar_summary": Write a single brief overview (approx. 100-150 characters in Japanese) summarizing the overall brand evaluation based on the AVERAGE of the quantity and quality scores.
@@ -570,6 +594,65 @@ if st.session_state.bas_result:
     else:
         st.write("重要な乖離は見つかりませんでした。")
         
+    st.divider()
+
+    # ==========================================
+    # ⑥ トークデザイン開発（★新規追加）
+    # ==========================================
+    st.markdown("### 🗣️ ⑥ トークデザイン開発（語りたくなる文脈の設計）")
+    st.caption("人々やAIが自発的に「語りたくなる文脈」を意図的に仕掛けるトークデザイン・マーケティングの戦略案です。推定ROI（認識変容から購買への転換予測）が高い順に10セットを提示します。")
+    
+    talk_designs = res.get("talk_designs", [])
+    if talk_designs:
+        for i, td in enumerate(talk_designs, 1):
+            hook = td.get("talk_hook", "")
+            context = td.get("talk_context", "")
+            asset = td.get("talk_asset", "")
+            circulation = td.get("talk_circulation", "")
+            roi_score = td.get("estimated_roi_score", 0)
+            roi_reasoning = td.get("roi_reasoning", "")
+            
+            # ランキング上位はメダルアイコンに変更
+            rank_icon = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+            
+            st.html(f"""
+            <div style="border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 25px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <div style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 15px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-weight: bold; font-size: 18px; color: #1e293b;">
+                        {rank_icon} 案: <span style="color: #0ea5e9;">「{hook}」</span>
+                    </div>
+                    <div style="background-color: #0ea5e9; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px;">
+                        推定ROI: {roi_score}
+                    </div>
+                </div>
+                
+                <div style="padding: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <div style="font-weight: bold; color: #475569; font-size: 13px; margin-bottom: 5px; text-transform: uppercase;">🕒 トーク・コンテキスト (誰が・いつ)</div>
+                            <div style="font-size: 15px; color: #334155; line-height: 1.5;">{context}</div>
+                        </div>
+                        <div>
+                            <div style="font-weight: bold; color: #475569; font-size: 13px; margin-bottom: 5px; text-transform: uppercase;">📑 トークアセット (証拠・ファクト)</div>
+                            <div style="font-size: 15px; color: #334155; line-height: 1.5;">{asset}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                        <div style="font-weight: bold; color: #166534; font-size: 13px; margin-bottom: 5px; text-transform: uppercase;">🔄 トーク・サーキュレーション (流通施策)</div>
+                        <div style="font-size: 15px; color: #333; line-height: 1.5;">{circulation}</div>
+                    </div>
+                    
+                    <div style="border-top: 1px dashed #cbd5e1; padding-top: 15px;">
+                        <div style="font-weight: bold; color: #64748b; font-size: 13px; margin-bottom: 5px;">📈 ROIの算出根拠 (認識変容 → 購買予測)</div>
+                        <div style="font-size: 14px; color: #475569; line-height: 1.5;">{roi_reasoning}</div>
+                    </div>
+                </div>
+            </div>
+            """)
+    else:
+        st.write("トークデザインのデータが生成されませんでした。")
+
     st.divider()
 
     # 参考情報
