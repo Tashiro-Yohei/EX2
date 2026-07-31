@@ -251,7 +251,6 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         },
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "usage_scene_moment"]
                     },
-                    "radar_quantity_summary": {"type": "string"},
                     "radar_quality": {
                         "type": "object",
                         "properties": {
@@ -263,7 +262,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         },
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "usage_scene_moment"]
                     },
-                    "radar_quality_summary": {"type": "string"},
+                    "radar_summary": {"type": "string"},
                     "radar_reasons": {
                         "type": "object",
                         "properties": {
@@ -276,7 +275,7 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                         "required": ["brand_philosophy", "functional_value", "emotional_engagement", "safety_reputation", "usage_scene_moment"]
                     }
                 },
-                "required": ["diagnosis_story", "topline", "competitive_analysis", "improvement_actions", "detailed_discrepancies", "radar_quantity", "radar_quantity_summary", "radar_quality", "radar_quality_summary", "radar_reasons"]
+                "required": ["diagnosis_story", "topline", "competitive_analysis", "improvement_actions", "detailed_discrepancies", "radar_quantity", "radar_quality", "radar_summary", "radar_reasons"]
             }
 
             prompt_analysis = f"""
@@ -311,9 +310,8 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "solution": Provide a concrete, highly specific PR/Marketing action to fix this AI perception gap.
             6. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the following 5 criteria from TWO perspectives:
                - "radar_quantity" (量的乖離/一致確率): Estimate the % probability (0-100) that the AI's answer MATCHES the owned media.
-               - "radar_quantity_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the quantitative radar chart.
                - "radar_quality" (質的乖離/類似度): Estimate the % similarity (0-100) of the AI's answers compared to the owned media.
-               - "radar_quality_summary": Write a brief overview (approx. 100-150 characters in Japanese) summarizing the overall shape of the qualitative radar chart.
+               - "radar_summary": Write a single brief overview (approx. 100-150 characters in Japanese) summarizing the overall brand evaluation based on the AVERAGE of the quantity and quality scores.
                CRITICAL for "radar_reasons": Provide a DETAILED business reason explaining BOTH the quantity and quality scores based on the data.
                Criteria:
                - "brand_philosophy": ブランド理念
@@ -393,15 +391,14 @@ if st.session_state.bas_result:
     st.divider()
 
     # ==========================================
-    # ② 生成AIからのブランド評価（量的乖離・質的乖離）
+    # ② 生成AIからのブランド評価（総合スコア）
     # ==========================================
-    st.markdown("### 📊 ② 生成AIからのブランド評価（2軸による乖離分析）")
-    st.caption("AIの認識ズレを「どれくらいの頻度で一致するか（量的乖離）」と「自社発信とどれくらい内容が似ているか（質的乖離）」の2軸（単位：％）で可視化しています。")
+    st.markdown("### 📊 ② 生成AIからのブランド評価（総合スコア）")
+    st.caption("AIの認識ズレを「量的乖離（一致確率）」と「質的乖離（内容の類似度）」の両面から評価し、その平均値を100点満点の総合スコアとして可視化しています。")
     
     q_qty = res.get("radar_quantity", {})
     q_qual = res.get("radar_quality", {})
-    qty_summary = res.get("radar_quantity_summary", "サマリーデータがありません。")
-    qual_summary = res.get("radar_quality_summary", "サマリーデータがありません。")
+    radar_summary = res.get("radar_summary", "サマリーデータがありません。")
     reasons = res.get("radar_reasons", {})
     
     categories = ['ブランド理念', '機能価値', '情緒的<br>エンゲージメント', '安全性と評判', '利用シーン・<br>モーメント']
@@ -411,85 +408,48 @@ if st.session_state.bas_result:
     qty_scores = [q_qty.get(k, 0) for k in keys]
     qual_scores = [q_qual.get(k, 0) for k in keys]
     
-    qty_closed = qty_scores + [qty_scores[0]]
-    qual_closed = qual_scores + [qual_scores[0]]
+    # 量的・質的の平均値（点）を計算
+    avg_scores = [int((qty + qual) / 2) for qty, qual in zip(qty_scores, qual_scores)]
+    avg_closed = avg_scores + [avg_scores[0]]
 
-    # --- 1段目：1. 量的乖離 ---
-    st.markdown("#### 🔵 1. 量的乖離（自社発信と一致する確率：％）")
-    col_chart1, col_summary1 = st.columns([1, 1.2])
+    col_chart, col_summary = st.columns([1, 1.2])
     
-    with col_chart1:
-        fig_qty = go.Figure()
-        fig_qty.add_trace(go.Scatterpolar(
-            r=qty_closed,
+    with col_chart:
+        fig_radar = go.Figure()
+        fig_radar.add_trace(go.Scatterpolar(
+            r=avg_closed,
             theta=categories_closed,
             fill='toself',
-            name='量的乖離',
-            line_color='#1a73e8',
-            fillcolor='rgba(26, 115, 232, 0.2)'
+            name='総合スコア',
+            line_color='#007bff',
+            fillcolor='rgba(0, 123, 255, 0.2)'
         ))
-        fig_qty.update_layout(
-            polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
+        fig_radar.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="点")),
             showlegend=False,
             margin=dict(l=40, r=40, t=30, b=30),
-            height=320 
+            height=350 
         )
-        st.plotly_chart(fig_qty, use_container_width=True, config={'staticPlot': True})
+        st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
         
-    with col_summary1:
+    with col_summary:
         st.html(f"""
-        <div style="margin-top: 20px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #1a73e8; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <div style="font-weight: bold; color: #1a73e8; margin-bottom: 12px; font-size: 16px;">
-                📈 量的乖離の全体傾向
+        <div style="margin-top: 20px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #007bff; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="font-weight: bold; color: #007bff; margin-bottom: 12px; font-size: 16px;">
+                📈 ブランド評価の全体傾向
             </div>
             <div style="font-size: 15px; color: #333; line-height: 1.8;">
-                {qty_summary}
+                {radar_summary}
             </div>
         </div>
         """)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- 2段目：2. 質的乖離 ---
-    st.markdown("#### 🟢 2. 質的乖離（自社発信と内容の類似度：％）")
-    col_chart2, col_summary2 = st.columns([1, 1.2])
-    
-    with col_chart2:
-        fig_qual = go.Figure()
-        fig_qual.add_trace(go.Scatterpolar(
-            r=qual_closed,
-            theta=categories_closed,
-            fill='toself',
-            name='質的乖離',
-            line_color='#28a745',
-            fillcolor='rgba(40, 167, 69, 0.2)'
-        ))
-        fig_qual.update_layout(
-            polar=dict(radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%")),
-            showlegend=False,
-            margin=dict(l=40, r=40, t=30, b=30),
-            height=320
-        )
-        st.plotly_chart(fig_qual, use_container_width=True, config={'staticPlot': True})
-        
-    with col_summary2:
-        st.html(f"""
-        <div style="margin-top: 20px; padding: 25px; background-color: #f8f9fa; border-left: 6px solid #28a745; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <div style="font-weight: bold; color: #28a745; margin-bottom: 12px; font-size: 16px;">
-                📈 質的乖離の全体傾向
-            </div>
-            <div style="font-size: 15px; color: #333; line-height: 1.8;">
-                {qual_summary}
-            </div>
-        </div>
-        """)
-
-    st.divider()
-
     # 評価理由をカード型デザインで表示
-    st.markdown("#### 📝 各項目の評価詳細（なぜこの数値になったのか）")
+    st.markdown("#### 📝 各項目の評価詳細（なぜこの点数になったのか）")
     
-    for title, key in zip(['ブランド理念の浸透度', '機能価値の伝達度', '情緒的エンゲージメント', 'ブランドの安全性と評判', '利用シーン・モーメント一致度'], keys):
+    for title, key, avg_val in zip(['ブランド理念の浸透度', '機能価値の伝達度', '情緒的エンゲージメント', 'ブランドの安全性と評判', '利用シーン・モーメント一致度'], keys, avg_scores):
         qty_val = q_qty.get(key, 0)
         qual_val = q_qual.get(key, 0)
         reason = reasons.get(key, 'データなし')
@@ -497,7 +457,7 @@ if st.session_state.bas_result:
         st.html(f"""
         <div style="border-left: 5px solid #007bff; background-color: #f8f9fa; padding: 15px; margin-bottom: 12px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
             <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: #333;">
-                🔹 {title}
+                🔹 {title} <span style="color:#007bff; font-size:18px; margin-left:10px;">{avg_val}点</span>
             </div>
             <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                 <div style="background-color: #e8f0fe; padding: 4px 10px; border-radius: 4px; font-size: 13px; color: #1a73e8; font-weight: bold;">
