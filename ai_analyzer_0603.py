@@ -341,7 +341,15 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
                - "roi_reasoning": ROI算出根拠. A brief explanation of why this specific score was given.
                - "impact_score": 効果 (0-100). How much impact this talk design has on changing consumer perception and driving purchases.
                - "feasibility_score": 実効性 (0-100). How realistic, cost-effective, and actionable the circulation strategy is.
-            7. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the 5 criteria. Average them for the summary.
+            7. "radar_quantity", "radar_quality", summaries & "radar_reasons": Score the Generative AI's perception in PERCENTAGE (0-100) for the 5 criteria.
+               - "radar_summary": Write a qualitative text overview (approx. 100-150 characters in Japanese) summarizing the overall brand evaluation. CRITICAL INSTRUCTION: DO NOT output just a number. You MUST write descriptive sentences explaining the overall strengths and weaknesses across the 5 criteria.
+               CRITICAL for "radar_reasons": Provide a DETAILED business reason explaining BOTH the quantity and quality scores based on the data.
+               Criteria:
+               - "brand_philosophy": ブランド理念
+               - "functional_value": 機能価値
+               - "emotional_engagement": 情緒的エンゲージメント
+               - "safety_reputation": 安全性と評判
+               - "usage_scene_moment": 利用シーン・モーメント一致度 (Match in usage context/timing). CRITICAL INSTRUCTION: Do NOT score 0% simply because the owned media keywords omit specific usage scenes. If the AI's suggested usage broadly aligns with the common sense/expected usage of this product type (e.g., 'daily use' vs 'only when tired'), consider it a match and score it favorably.
             Return JSON in Japanese.
             """
 
