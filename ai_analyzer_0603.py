@@ -86,6 +86,7 @@ with st.sidebar:
     
     st.divider()
     st.markdown("### 📂 データのアップロード")
+    st.caption("※少なくとも1つのファイルをアップロードしてください")
     uploaded_pptx = st.file_uploader("❶ 生成AI分析資料（PPTX）", type=["pptx"])
     uploaded_csv = st.file_uploader("❷ 生成AIでの言及数データ(CSV)", type=["csv", "txt"])
     uploaded_docx = st.file_uploader("❸ 生成AIのブランド評価(DOCX)", type=["docx"])
@@ -145,8 +146,14 @@ def load_csv_data(file):
 
 # --- 2. 分析ロジック ---
 if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_container_width=True):
-    if not api_key or not brand_url or not uploaded_pptx or not uploaded_csv or not uploaded_docx:
-        st.error("左側のサイドバーで、APIキー、URL、および3つのファイルをすべてセットしてください。")
+    # バリデーション：APIキーとURLのチェック
+    if not api_key or not brand_url:
+        st.error("左側のサイドバーで、APIキーとURLを入力してください。")
+        st.stop()
+        
+    # バリデーション：ファイルが1つ以上あるかチェック
+    if not uploaded_pptx and not uploaded_csv and not uploaded_docx:
+        st.error("分析を実行するには、少なくとも1つのファイル（PPTX, CSV, DOCXのいずれか）をアップロードしてください。")
         st.stop()
 
     with st.spinner("AIがデータを解析し、経営・マーケティング向けのレポートを作成中..."):
@@ -154,15 +161,17 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
             client = genai.Client(api_key=api_key)
             model_name = "gemini-2.5-flash"
             
-            pptx_text = extract_text_from_pptx(uploaded_pptx)
-            df_raw = load_csv_data(uploaded_csv)
-            docx_text = extract_text_from_docx(uploaded_docx)
+            # 各ファイルのテキスト抽出（ファイルがない場合は「データなし」とする）
+            pptx_text = extract_text_from_pptx(uploaded_pptx) if uploaded_pptx else "データなし"
+            docx_text = extract_text_from_docx(uploaded_docx) if uploaded_docx else "データなし"
             
-            if df_raw is None:
-                st.error("CSVファイルの読み込みに失敗しました。")
-                st.stop()
-                
-            csv_context = df_raw.head(35).to_csv(index=False)
+            csv_context = "データなし"
+            if uploaded_csv:
+                df_raw = load_csv_data(uploaded_csv)
+                if df_raw is None:
+                    st.error("CSVファイルの読み込みに失敗しました。")
+                    st.stop()
+                csv_context = df_raw.head(35).to_csv(index=False)
             
             # Phase 1: オウンドメディアからのキーワード抽出
             prompt_dict = f"""
@@ -170,6 +179,8 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
             
             [戦略資料テキスト]
             {pptx_text}
+            
+            ※【重要】[戦略資料テキスト]が「データなし」の場合は、ブランド名と公式URLの情報を基に、このブランドが目指しているであろうキーワードを推測して5つずつ抽出してください。
             """
             
             dict_schema = {
@@ -307,14 +318,16 @@ if st.button("🚀 戦略ギャップ分析を実行", type="primary", use_conta
             [GENERATIVE AI BRAND EVALUATION (DOCX)]
             {docx_text}
             
+            ※【重要】[GENERATIVE AI RANKING DATA (CSV)]や[GENERATIVE AI BRAND EVALUATION (DOCX)]が「データなし」となっている場合は、あなた自身（生成AI）の持つ一般的な知識やデータを用いて、自社のキーワードと現在のAIの認識の間にどのようなギャップがあるかを自己評価・分析してください。
+            
             TASK:
             1. "diagnosis_story": Write 3 fluent narrative paragraphs in Japanese (EACH strictly around 200-250 characters) aimed at business executives.
             2. "topline": Write a single-sentence summary strategy for executives.
-            3. "competitive_analysis": Analyze how the AI perceives the brand relative to its competitors based ONLY on the provided data. DO NOT USE NUMERICAL SCORES AND DO NOT LIST SIMPLE WIN/LOSS.
+            3. "competitive_analysis": Analyze how the AI perceives the brand relative to its competitors based ONLY on the provided data (or your inherent knowledge if data is missing). DO NOT USE NUMERICAL SCORES AND DO NOT LIST SIMPLE WIN/LOSS.
                - "benchmark_competitors": ベンチマークとすべき企業 (Qualitatively suggest 1-2 competitor brands. Explain WHY. Around 80-120 characters).
                - "mention_volume_comparison", "mention_order_comparison", "mention_content_comparison", "strategic_advice".
             4. "improvement_actions": Provide EXACTLY 5 clear, actionable marketing steps.
-            5. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements. Focus entirely on what the AI currently outputs versus the intended keywords.
+            5. "detailed_discrepancies": Identify up to 10 HIGHLY SPECIFIC perception issues or missing elements. Focus entirely on what the AI currently outputs versus the intended keywords. If data is "データなし", use your inherent AI knowledge to identify gaps.
             6. "talk_designs": Develop EXACTLY 10 "Talk Design Marketing" strategies.
                CRITICAL STRATEGIC GOAL: Do NOT simply pander to the AI's current perception. The ultimate goal is to design context that forces both humans and AI to move CLOSER to the company's TRUE INTENDED MESSAGE (as defined in [OWNED MEDIA KEYWORDS]). Exclude any ideas that are disconnected from the company's intended message, but creatively expand ideas as long as they logically connect back to what the brand wants to communicate.
                QUALITY CONTROL PROCESS: Act as a team of elite Dentsu copywriters and strategic marketers. Do NOT output your first draft. Internally, you MUST review, critique, and polish these 10 ideas at least 3 TIMES before generating the JSON. Ensure the ideas are not amateurish, generic, or overly corporate.
@@ -685,6 +698,6 @@ else:
         <div style="text-align:center; padding:100px 20px; color:#94a3b8;">
             <p style="font-size:40px; margin:0;">📥</p>
             <h4 style="margin:10px 0 0 0; color:#64748b;">データがセットされていません</h4>
-            <p style="font-size:14px; margin:5px 0 0 0;">左側のサイドバーにAPIキーを入力し、3つのファイルをセットして「分析を開始する」を押してください。</p>
+            <p style="font-size:14px; margin:5px 0 0 0;">左側のサイドバーにAPIキーを入力し、少なくとも1つのファイル（PPTX, CSV, DOCXのいずれか）をセットして「分析を開始する」を押してください。</p>
         </div>
     """)
